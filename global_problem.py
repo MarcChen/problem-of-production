@@ -11,10 +11,10 @@ from scipy.stats import norm
 n = 50
 temp_c_bar = 1
 temp_c_max = np.ones((2*n,1))
-temp_mean_R = np.full((2,n), 0.3)
-temp_D = np.full((2*n,2*n),350)
-temp_mean_D = np.full((2*n,2*n),350)
-temp_sigma_D = 0.3 * temp_D 
+temp_mean_R = np.full((2*n,1), 0.3)
+temp_D = np.full((2*n,1),350)
+temp_mean_D = 350
+temp_sigma_D = 0.3 * temp_mean_D
 temp_epsilon = 0.1
 temp_cov_R = r = np.full((2*n,2*n), 0.5)
 
@@ -23,22 +23,25 @@ def optimization(c_bar = temp_c_bar, c_max = temp_c_max, cov_R = temp_cov_R , me
     phi_inv_epsilon = norm.ppf(epsilon)
 
     # Define the optimization variable
-    c = cp.Variable((2*n,1))
+    c = cp.Variable((2*n,1),nonneg=True) # non-negativity
 
     # Define the objective function
-    objective = cp.Minimize(c @ cov_R @ c)
+    objective = cp.Minimize(cp.quad_form(c, cov_R))
 
     # Define the constraints
-    constraints = [
-        c >= 0,  # non-negativity
+    constraints = [ 
         c <= c_max,  # upper bound
         cp.sum(c) == c_bar,  # total capacity
-        mean_R @ c >= mean_D - np.sqrt((c @ c @ cov_R) + sigma_D^2) * phi_inv_epsilon  # probabilistic constraint
+        c.T @ mean_R >= mean_D - cp.sqrt(cp.quad_form(c, cov_R) + sigma_D*sigma_D) * phi_inv_epsilon  # probabilistic constraint
     ]
 
     # Define and solve the problem
     problem = cp.Problem(objective, constraints)
+    print("prob is DCP:", problem.is_dcp())
+    print (" Probability constraint is DCP:", (c.T @ mean_R >= mean_D * phi_inv_epsilon).is_dcp())
+    print("status:", problem.status)
     problem.solve()
+    
 
     return [c.value, problem.value]
 
