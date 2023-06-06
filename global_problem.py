@@ -23,8 +23,11 @@ temp_sigma_D = 0.3
 temp_epsilon = 0.1
 temp_cov_R = r = np.eye(2*temp_n,2*temp_n)
 
+def f_pconstraint(c, r = temp_mean_R, d = temp_mean_D, sigma_D = temp_sigma_D, epsilon = temp_epsilon, cov_R = temp_cov_R):
+    return - c.T @ r + d - np.sqrt(c.T @ cov_R @ c + sigma_D ** 2) * norm.ppf(epsilon)  
 
-def cvxpy_solver(c_bar = temp_c_bar, c_max = temp_c_max, cov_R = temp_cov_R , mean_R = temp_mean_R , sigma_D = temp_sigma_D , epsilon = temp_epsilon,mean_D = temp_mean_D, n=temp_n):
+
+def cvxpy_solver(c_bar = temp_c_bar, c_max = temp_c_max, cov_R = temp_cov_R , r = temp_mean_R , sigma_D = temp_sigma_D , epsilon = temp_epsilon, d = temp_mean_D, n=temp_n):
     # Quantile of standard normal distribution for the given epsilon
     phi_inv_epsilon = norm.ppf(epsilon)
 
@@ -38,18 +41,36 @@ def cvxpy_solver(c_bar = temp_c_bar, c_max = temp_c_max, cov_R = temp_cov_R , me
     constraints = [ 
         c <= c_max,  # upper bound
         cp.sum(c) == c_bar,  # total capacity
-        #c.T @ mean_R >= mean_D - cp.sqrt(cp.quad_form(c, cov_R) + sigma_D*sigma_D) * phi_inv_epsilon  # probabilistic constraint
     ]
 
     # Define and solve the problem
     problem = cp.Problem(objective, constraints)
-    print("prob is DCP:", problem.is_dcp())
-    print (" Probability constraint is DCP:", (c.T @ mean_R >= mean_D * phi_inv_epsilon).is_dcp())
-    print("status:", problem.status)
     problem.solve()
-    
+    print("status:", problem.status)
 
-    return [c.value, problem.value]
+    if (f_pconstraint(c.value) <= 0):
+        # probalistic constraint is respected 
+        print("No probalistic constraint", end ='\n')
+        print("c result = ", c.value , " and the value is ", problem.value, end ='\n')
+        return [c.value, problem.value]
+    else :
+        # otherwise, minimize the following objective function 
+        c_2 = cp.Variable((2*n,1),nonneg=True) # non-negativity
+        objective_2 = cp.Minimize( ((d-c_2.T @ r )/phi_inv_epsilon)**2 - sigma_D **2  )
+        
+        constraints_2 = [ 
+        c_2 <= c_max,  # upper bound
+        cp.sum(c_2) == c_bar,  # total capacity
+        ]
+        
+        problem_2 = cp.Problem(objective_2,constraints_2)
+        problem_2.solve()
+
+        print("Probalistic constraint", end ='\n')
+        print("c result = \n", c_2.value , " and the value is ", c_2.value.T @ cov_R @ c_2.value, end ='\n')
+        return [c_2.value, problem_2.value]
+        
+'''
 
 def f(x, grad, cov_R = temp_cov_R):
     if grad.size > 0 : 
@@ -88,8 +109,6 @@ def nlopt_solver(c_bar = temp_c_bar, c_max = temp_c_max, cov_R = temp_cov_R , me
     print("optimal value =", minf)
     print("optimal x =", x_opt)
      
-nlopt_solver()
-
 def objective(c, cov_R):
     return c @ cov_R @ c
 
@@ -121,16 +140,16 @@ def scipy_solver(c_bar = temp_c_bar, c_max = temp_c_max, cov_R = temp_cov_R , me
     print("Termination message:", result.message)
     print("Number of iterations:", result.nit)
 
-"""
+'''
+    
 start = time.time()
 [c_result, inf_value] = cvxpy_solver()
 end = time.time()
 
-print("c result = ", c_result, " and the value is ", inf_value, end ='\n')
-print("Computing time : ", end-start)
+print("Computing time : ", (end-start) * 10**3, "ms")
 
-scipy_solver()
-"""
+#scipy_solver()
+
 
 ### Solving the optimization problem ###
 
