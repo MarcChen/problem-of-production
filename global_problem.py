@@ -1,7 +1,8 @@
 import pandas as pd
 import numpy as np 
-import import_data 
 import cvxpy as cp
+import time 
+import nlopt
 from scipy.stats import norm
 from scipy.optimize import minimize
 
@@ -20,11 +21,10 @@ temp_D = np.full((2*temp_n,1),350)
 temp_mean_D = 350
 temp_sigma_D = 0.3 
 temp_epsilon = 0.1
-temp_cov_R = r = np.full((2*temp_n,2*temp_n), 0.5)
+temp_cov_R = r = np.eye(2*temp_n,2*temp_n)
 
-"""
 
-def optimization(c_bar = temp_c_bar, c_max = temp_c_max, cov_R = temp_cov_R , mean_R = temp_mean_R , sigma_D = temp_sigma_D , epsilon = temp_epsilon,mean_D = temp_mean_D):
+def cvxpy_solver(c_bar = temp_c_bar, c_max = temp_c_max, cov_R = temp_cov_R , mean_R = temp_mean_R , sigma_D = temp_sigma_D , epsilon = temp_epsilon,mean_D = temp_mean_D, n=temp_n):
     # Quantile of standard normal distribution for the given epsilon
     phi_inv_epsilon = norm.ppf(epsilon)
 
@@ -38,7 +38,7 @@ def optimization(c_bar = temp_c_bar, c_max = temp_c_max, cov_R = temp_cov_R , me
     constraints = [ 
         c <= c_max,  # upper bound
         cp.sum(c) == c_bar,  # total capacity
-        c.T @ mean_R >= mean_D - cp.sqrt(cp.quad_form(c, cov_R) + sigma_D*sigma_D) * phi_inv_epsilon  # probabilistic constraint
+        #c.T @ mean_R >= mean_D - cp.sqrt(cp.quad_form(c, cov_R) + sigma_D*sigma_D) * phi_inv_epsilon  # probabilistic constraint
     ]
 
     # Define and solve the problem
@@ -51,11 +51,44 @@ def optimization(c_bar = temp_c_bar, c_max = temp_c_max, cov_R = temp_cov_R , me
 
     return [c.value, problem.value]
 
-[c_result, inf_value] = optimization()
+def f(x, grad, cov_R = temp_cov_R):
+    if grad.size > 0 : 
+        grad[:] = cov_R @ x 
+    return x @ cov_R @ x
 
-print("c result = ", c_result, " and the value is ", inf_value)
+def constraint(x,grad, r = temp_mean_R, d = temp_mean_D, sigma_D = temp_sigma_D, epsilon = temp_epsilon, cov_R = temp_cov_R):
+    if grad.size > 0 : 
+        grad[:] = - cov_R @ x - cov_R @ x / np.sqrt( x @ cov_R @ x )
+    return  - x @ r + d - np.sqrt(d @ cov_R @ d + sigma_D ** 2) * norm.ppf(epsilon)  
 
-"""
+def nlopt_solver(c_bar = temp_c_bar, c_max = temp_c_max, cov_R = temp_cov_R , mean_R = temp_mean_R , sigma_D = temp_sigma_D , epsilon = temp_epsilon,mean_D = temp_mean_D, n=temp_n):
+
+    # Initialize the optimizer
+    opt = nlopt.opt(nlopt.LD_MMA, 2 * n)  # 2n is the dimension of the problem
+
+    # Set the objective function
+    opt.set_min_objective(f)
+
+    # Set the constraints
+    opt.add_inequality_constraint(constraint, 1e-8)
+
+    # Set the lower and upper bounds for the capacities
+    lower_bounds = np.zeros((2 * n, 1)) # Replace with actual lower bounds
+    upper_bounds = np.ones((2 * n,1))   # Replace with actual upper bounds
+    opt.set_lower_bounds(lower_bounds)
+    opt.set_upper_bounds(upper_bounds)
+
+    # Set the initial guess
+    x = np.ones(2 * n)  # Replace with an actual initial guess
+
+    # Optimize
+    x_opt = opt.optimize(x)
+    minf = opt.last_optimum_value()
+
+    print("optimal value =", minf)
+    print("optimal x =", x_opt)
+     
+nlopt_solver()
 
 def objective(c, cov_R):
     return c @ cov_R @ c
@@ -72,7 +105,7 @@ def scipy_solver(c_bar = temp_c_bar, c_max = temp_c_max, cov_R = temp_cov_R , me
 
     # Constraints
     constraints = [
-        {'type': 'ineq', 'fun': lambda c: demand_constraint(c, mean_R, mean_D, sigma_D, epsilon,cov_R)},
+        #{'type': 'ineq', 'fun': lambda c: demand_constraint(c, mean_R, mean_D, sigma_D, epsilon,cov_R)},
         {'type': 'eq', 'fun': lambda c: total_capacity_constraint(c, c_bar)}
     ]
 
@@ -88,8 +121,16 @@ def scipy_solver(c_bar = temp_c_bar, c_max = temp_c_max, cov_R = temp_cov_R , me
     print("Termination message:", result.message)
     print("Number of iterations:", result.nit)
 
+"""
+start = time.time()
+[c_result, inf_value] = cvxpy_solver()
+end = time.time()
+
+print("c result = ", c_result, " and the value is ", inf_value, end ='\n')
+print("Computing time : ", end-start)
 
 scipy_solver()
+"""
 
 ### Solving the optimization problem ###
 
