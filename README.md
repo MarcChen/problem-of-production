@@ -39,7 +39,7 @@ with additional constraint :
 
 - **Probability constraint reformulation :**
 
-Introduce $r:=\mathbb{E}[R], d:=\mathbb{E}[D]$ and $\sigma_{c}^{2}:=\operatorname{Var}\left(c^{\top} R-D\right)$. Define the random variable $X_{c}$ by
+Introduce $r:=\mathbb{E}[R], d:=\mathbb{E}[D]$ and $\sigma_{c}^{2}:=\text{Var}\left(c^{\top} R-D\right)$. Define the random variable $X_{c}$ by
 
 $$
 X:=\frac{c^{\top} R-D-\left(c^{\top} r-d\right)}{\sigma_{c}}
