@@ -5,6 +5,7 @@ import time
 import nlopt
 from scipy.stats import norm
 from scipy.optimize import minimize
+from scipy.optimize import NonlinearConstraint
 
 ### Importing the DATA ### 
 '''
@@ -108,7 +109,9 @@ def nlopt_solver(c_bar = temp_c_bar, c_max = temp_c_max, cov_R = temp_cov_R , me
 
     print("optimal value =", minf)
     print("optimal x =", x_opt)
-     
+
+    '''
+
 def objective(c, cov_R):
     return c @ cov_R @ c
 
@@ -123,16 +126,15 @@ def scipy_solver(c_bar = temp_c_bar, c_max = temp_c_max, cov_R = temp_cov_R , me
     bounds = [(0, c_max[i][0]) for i in range(2*n)]
 
     # Constraints
-    constraints = [
-        #{'type': 'ineq', 'fun': lambda c: demand_constraint(c, mean_R, mean_D, sigma_D, epsilon,cov_R)},
-        {'type': 'eq', 'fun': lambda c: total_capacity_constraint(c, c_bar)}
-    ]
+    con1 = {'type': 'eq', 'fun': lambda c: total_capacity_constraint(c, c_bar)}
+    con2 = NonlinearConstraint(lambda c: demand_constraint(c, mean_R, mean_D, sigma_D, epsilon,cov_R), -np.inf, 0)
+    cons = ([con1,con2])
 
     # Initial guess
     c0 = np.full(2*n,0.2)
 
     # Optimization
-    result = minimize(objective, c0, args=(cov_R), constraints=constraints, bounds=bounds, method="SLSQP",tol=1e-6)
+    result = minimize(objective, c0, args=(cov_R), constraints=cons, bounds=bounds, method="SLSQP",tol=1e-6)
 
     print("Optimized solution:", result.x)
     print("Optimization success:", result.success)
@@ -140,16 +142,19 @@ def scipy_solver(c_bar = temp_c_bar, c_max = temp_c_max, cov_R = temp_cov_R , me
     print("Termination message:", result.message)
     print("Number of iterations:", result.nit)
 
+
 '''
-    
 start = time.time()
 [c_result, inf_value] = cvxpy_solver()
 end = time.time()
 
+print("Computing time : ", (end-start) * 10**3, "ms")'''
+
+start = time.time()
+scipy_solver()
+end = time.time()
+
 print("Computing time : ", (end-start) * 10**3, "ms")
-
-#scipy_solver()
-
 
 ### Solving the optimization problem ###
 

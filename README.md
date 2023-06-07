@@ -19,7 +19,7 @@ The main objectives of this problem are:
 The problem can be formulated as follows:
 
 $$
-\inf _{c} c^{\top} \operatorname{Cov}(R) c
+\inf _{c} c^{\top} \text{Cov}(R) c
 $$
 
 under the constraint that
@@ -50,7 +50,7 @@ Regarding the first problem, it's a quadratic optimization problem with linear c
 1. Clone this repository : 
 ``git clone https://github.com/MarcChen/problem-of-production``
 
-2. Set up the required environment and dependencies 
+2. Downloading your data into the ``data/`` folder 
 3. Follow the instructions in the ``code/`` folder to run the implementation and analyze the results.
 
 ## Know issues 
@@ -58,8 +58,8 @@ Regarding the first problem, it's a quadratic optimization problem with linear c
 ## Contributors 
 
 - Fred Espen Beth 
-- Marianne 
-- Aleksander 
+- Marianne Zeyringer
+- Aleksander Grochowicz
 
 # Sources 
 
