@@ -34,8 +34,37 @@ with additional constraint :
 
 2. Total capacity is limited (by costs, say): $c^{\top} \mathbf{1}=\bar{c}$, where $\bar{c}$ is some positive number.
 
-
+***
 ### Approach 
+
+- **Probability constraint reformulation :**
+
+Introduce $r:=\mathbb{E}[R], d:=\mathbb{E}[D]$ and $\sigma_{c}^{2}:=\operatorname{Var}\left(c^{\top} R-D\right)$. Define the random variable $X_{c}$ by
+
+$$
+X:=\frac{c^{\top} R-D-\left(c^{\top} r-d\right)}{\sigma_{c}}
+$$
+
+Notice that if $(R, D)$ is assumed to be a multivariate Gaussian random variable, then $X$ is standard normal, and we denote its distribution function by $\Phi$
+
+$$
+\begin{aligned}
+\mathbb{P}\left(c^{\top} R \leq D\right) & =\mathbb{P}\left(c^{\top} r-d+\sigma_{c} X \leq 0\right) \\
+& =\mathbb{P}\left(X \leq \frac{d-c^{\top} r}{\sigma_{c}}\right) \\
+& =\Phi\left(\frac{d-c^{\top} r}{\sigma_{c}}\right) \\
+& \leq \epsilon
+\end{aligned}
+$$
+
+$$
+c^{\top} r \geq d-\sigma \Phi^{-1}(\epsilon)
+$$
+
+- **Probability distribution estimation :**
+
+Estimate the mean and covariance matrix of capacity factors and demand based on available data, such as capacity factor time series data aggregated on an annual basis. A **multivariate Gaussian distribution assumption** is often used, but alternative methods like AR-process modeling can also be considered.
+
+***
 
 #### How the minimization problem is computed ? 
 
@@ -60,6 +89,7 @@ Regarding the first problem, it's a quadratic optimization problem with linear c
 - Fred Espen Beth 
 - Marianne Zeyringer
 - Aleksander Grochowicz
+- Marc Chen 
 
 # Sources 
 
