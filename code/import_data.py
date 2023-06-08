@@ -1,40 +1,91 @@
 import numpy as np 
+import cvxpy as cp
 
 ### Importing the data ###
 
-def numpy_csv_reader(file_path, delimiter=',', dtype=float, skiprows=1):
-    data = np.loadtxt(file_path, delimiter=delimiter, dtype=dtype, skiprows=skiprows)
-    return 
+def numpy_csv_reader(file_path_wind, file_path_pv ,delimiter=',', dtype=float, skiprows=1):
+
+    ### This part has to be adapted to your own datas 
+    headers = ['time','fr', 'hr', 'hu', 'at', 'be', 'bg', 'ch', 'cz', 'de', 'dk', 'ee', 'ie', 'es', 'fi', 'pt', 'ro', 'se', 'si', 'sk', 'uk', 'no', 'it', 'lt', 'lu', 'lv', 'mt', 'nl', 'pl']
+    n = len(headers) - 1 
+
+    # First column is an string type 
+    times = np.loadtxt(file_path_wind, delimiter=delimiter, dtype=str, skiprows=skiprows, usecols=0)
+
+    wind_data = np.loadtxt(file_path_wind, delimiter=delimiter, dtype=dtype, skiprows=skiprows, usecols=range(1, n+1))
+    pv_data = np.loadtxt(file_path_wind, delimiter=delimiter, dtype=dtype, skiprows=skiprows, usecols=range(1, n+1))
+    
+    return [headers, wind_data, pv_data, times, n]
 
 ### Data formating process ###
 
-def computing_mean(datas):
-    # Coverting to np arrays
-    datas = np.array(datas)
+[header, wind_data, pv_data, times, n] = numpy_csv_reader("../data/wind_data_annual.csv","../data/pv_data_annual.csv")
 
-    # Compute the mean
-    mean = np.mean(datas, axis=0)
+
+def computing_mean(wind_data,pv_data, n):
+
+    r = np.zeros(2*n)
+
+    ### Computing the mean
+
+    r1 = np.mean(wind_data, axis=0)
+    r2 = np.mean(pv_data, axis=0)
     
-    return mean
+    r = np.concatenate((r1, r2), axis=0)
+    return r
 
-def compute_covariance_matrix(datas):
-    n = len(datas) // 2  # Compute the value of n based on the length of the vector
+r = computing_mean(wind_data,pv_data,n)
 
-    # Split the vector into wind and PV components
-    wind_component = datas[:n]
-    pv_component = datas[n:]
+def make_positive_definite(matrix, epsilon=1e-6):
+    # Compute the eigenvalues and eigenvectors
+    eigenvalues, eigenvectors = np.linalg.eigh(matrix)
 
-    # Compute the covariance matrices
-    cov_wind = np.cov(wind_component)
-    cov_pv = np.cov(pv_component)
-    cov_wind_pv = np.cov(wind_component, pv_component)
-    cov_pv_wind = np.cov(pv_component, wind_component)
+    # Clip any negative eigenvalues to a small positive number
+    eigenvalues = np.maximum(eigenvalues, epsilon)
 
-    # Create the covariance matrix Cov(R)
-    cov_r = np.block([[cov_wind, cov_wind_pv], [cov_pv_wind, cov_pv]])
+    # Recompute the matrix with the new eigenvalues
+    positive_definite_matrix = eigenvectors @ np.diag(eigenvalues) @ eigenvectors.T
 
-    return cov_r
+    return positive_definite_matrix
 
+def make_positive_definite_sdp(matrix):
+    # Create a variable to represent the positive definite matrix
+    X = cp.Variable(matrix.shape, symmetric=True)
+
+    # Define the constraints: X must be positive semidefinite, and its diagonals must match the original matrix
+    constraints = [X >> 0]
+    for i in range(matrix.shape[0]):
+        constraints.append(X[i, i] == matrix[i, i])
+
+    # Define the objective function: minimize the Frobenius norm of the difference between X and the original matrix
+    objective = cp.Minimize(cp.norm(X - matrix, 'fro'))
+
+    # Define and solve the problem
+    problem = cp.Problem(objective, constraints)
+    problem.solve()
+
+    # Return the solution
+    return X.value
+
+
+def r_covariance_matrix(wind_data,pv_data,n):
+
+    cov_r = np.cov(pv_data, wind_data,rowvar=False)
+
+    # Chef wether cov_r is definite positive or not
+
+    eigenvalues = np.linalg.eigvalsh(cov_r)
+
+    # Check if all eigenvalues are strictly greater than zero
+    is_positive_definite = np.all(eigenvalues > 0)
+
+    if is_positive_definite :
+        return cov_r
+    else:
+        # Variances can't be changed, turning cov_r into a positive definite one 
+        return make_positive_definite(cov_r)
+    
+cov_r = r_covariance_matrix(wind_data,pv_data,n)
 
 def computing_RD_covariance(R_array, D_array):
     

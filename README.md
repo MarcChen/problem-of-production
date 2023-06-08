@@ -8,7 +8,7 @@ The main goal of the project is to study the possibility to put renewable plant 
 
 ### Problem Description 
 
-The problem involves n locations (countries in Europe, for example) with annual capacity factors for wind and PV represented by random variables W = (W1, ..., Wn) and PV = (PV1, ..., PVn) respectively. The 2n-dimensional vector R = (W, PV) represents the wind and PV capacity factors. The vector of capacities installed in each location is denoted by c = (cw, cpv), where ci = (ci1, ..., cin) for i = W, PV. The production is given by P = c * R, where * denotes the matrix/vector multiplication.
+The problem involves $n$ locations (countries in Europe, for example) with annual capacity factors for wind and PV represented by random variables $W = (W_1, ..., W_n)$ and $PV = (PV_1, ..., PV_n)$ respectively. The $2n$-dimensional vector $R = (W, PV)$ represents the wind and PV capacity factors. The vector of capacities installed in each location is denoted by $c = (c_w, c_{pv})$, where $c_i = (c_{i1}, ..., c_{in})$ for $i = W, PV$. The production is given by $P = c \cdot R$, where $\cdot$ denotes the matrix/vector multiplication.
 
 The main objectives of this problem are:
 
@@ -79,8 +79,8 @@ Regarding the first problem, it's a quadratic optimization problem with linear c
 1. Clone this repository : 
 ``git clone https://github.com/MarcChen/problem-of-production``
 
-2. Downloading your data into the ``data/`` folder 
-3. Follow the instructions in the ``code/`` folder to run the implementation and analyze the results.
+2. Downloading your data into the [data](https://github.com/MarcChen/problem-of-production/tree/main/data) folder 
+3. Follow the instructions in the [code](https://github.com/MarcChen/problem-of-production/tree/main/code) folder to run the implementation and analyze the results.
 
 ## Know issues 
 
