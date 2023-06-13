@@ -1,25 +1,32 @@
 import numpy as np 
 import cvxpy as cp
+import csv
+import time 
+
 
 ### Importing the data ###
 
-def numpy_csv_reader(file_path_wind, file_path_pv ,delimiter=',', dtype=float, skiprows=1):
+def numpy_csv_reader(file_path_wind, file_path_pv , file_path_demand, delimiter=',', dtype=float, skiprows=1):
 
-    ### This part has to be adapted to your own datas 
-    headers = ['time','fr', 'hr', 'hu', 'at', 'be', 'bg', 'ch', 'cz', 'de', 'dk', 'ee', 'ie', 'es', 'fi', 'pt', 'ro', 'se', 'si', 'sk', 'uk', 'no', 'it', 'lt', 'lu', 'lv', 'mt', 'nl', 'pl']
-    n = len(headers) - 1 
+    # Read the CSV file to extract the headers
+    with open(file_path_wind, 'r') as f:
+        reader = csv.reader(f, delimiter=delimiter)
+        headers = next(reader)
+
+    n = len(headers) - 1
 
     # First column is an string type 
     times = np.loadtxt(file_path_wind, delimiter=delimiter, dtype=str, skiprows=skiprows, usecols=0)
 
     wind_data = np.loadtxt(file_path_wind, delimiter=delimiter, dtype=dtype, skiprows=skiprows, usecols=range(1, n+1))
     pv_data = np.loadtxt(file_path_wind, delimiter=delimiter, dtype=dtype, skiprows=skiprows, usecols=range(1, n+1))
-    
-    return [headers, wind_data, pv_data, times, n]
+    demand_data = np.loadtxt(file_path_demand, delimiter=delimiter, dtype=dtype, skiprows=skiprows, usecols=range(1, n+1))
+
+    return [headers, wind_data, pv_data, demand_data, times, n]
 
 ### Data formating process ###
 
-[header, wind_data, pv_data, times, n] = numpy_csv_reader("../data/wind_data_annual.csv","../data/pv_data_annual.csv")
+#[header, wind_data, pv_data, demand, times, n] = numpy_csv_reader("../data/wind_data_annual_matching_modified.csv","../data/pv_data_annual_matching_modified.csv","../data/demand_data_annual_matching_modified.csv")
 
 
 def computing_mean(wind_data,pv_data, n):
@@ -34,9 +41,8 @@ def computing_mean(wind_data,pv_data, n):
     r = np.concatenate((r1, r2), axis=0)
     return r
 
-r = computing_mean(wind_data,pv_data,n)
-
 def make_positive_definite(matrix, epsilon=1e-6):
+    start=time.time()
     # Compute the eigenvalues and eigenvectors
     eigenvalues, eigenvectors = np.linalg.eigh(matrix)
 
@@ -45,10 +51,13 @@ def make_positive_definite(matrix, epsilon=1e-6):
 
     # Recompute the matrix with the new eigenvalues
     positive_definite_matrix = eigenvectors @ np.diag(eigenvalues) @ eigenvectors.T
-
+    end = time.time()
+    print("\033[92mclipping time : {} ms\033[0m".format((end-start) * 10 **3))
     return positive_definite_matrix
 
 def make_positive_definite_sdp(matrix):
+    start = time.time()
+    matrix += np.eye(matrix.shape[0]) * 1e-5
     # Create a variable to represent the positive definite matrix
     X = cp.Variable(matrix.shape, symmetric=True)
 
@@ -63,29 +72,48 @@ def make_positive_definite_sdp(matrix):
     # Define and solve the problem
     problem = cp.Problem(objective, constraints)
     problem.solve()
+    end = time.time()
+    #print("sdp status:", problem.status)
+    print("\033[92msdp : {} ms\033[0m".format((end-start) * 10 **3))
 
     # Return the solution
     return X.value
 
 
+def is_positive_definite(M):
+
+    eigenvalues = np.linalg.eigvalsh(M)
+
+    # Check if all eigenvalues are strictly greater than zero
+    is_positive_definite = np.all(eigenvalues >= 0)
+
+    return is_positive_definite
+
 def r_covariance_matrix(wind_data,pv_data,n):
 
     cov_r = np.cov(pv_data, wind_data,rowvar=False)
 
-    # Chef wether cov_r is definite positive or not
-
-    eigenvalues = np.linalg.eigvalsh(cov_r)
-
-    # Check if all eigenvalues are strictly greater than zero
-    is_positive_definite = np.all(eigenvalues > 0)
-
-    if is_positive_definite :
+    if is_positive_definite(cov_r) :
         return cov_r
     else:
         # Variances can't be changed, turning cov_r into a positive definite one 
-        return make_positive_definite(cov_r)
-    
-cov_r = r_covariance_matrix(wind_data,pv_data,n)
+        print("Covariance matrix isn't definite positive ! \n")
+        '''
+        print("Clipping value : \n", np.absolute(cov_r - make_positive_definite(cov_r)), " \n")
+        print("clipping is definite positive", is_positive_definite(make_positive_definite(cov_r)))
+        print("Sdp : \n", np.absolute(cov_r - make_positive_definite_sdp(cov_r)))
+        print("sdp is definite positive", is_positive_definite(make_positive_definite_sdp(cov_r)))         '''
+
+        sdp = make_positive_definite_sdp(cov_r)
+
+        if is_positive_definite(sdp):
+            print("\033[91mchosed sdp method.\033[0m")
+            return sdp
+        else:
+            print("\033[91mchosed clipping method.\033[0m")
+            return make_positive_definite(cov_r)
+
+
 
 def computing_RD_covariance(R_array, D_array):
     

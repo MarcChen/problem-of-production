@@ -6,29 +6,34 @@ import nlopt
 from scipy.stats import norm
 from scipy.optimize import minimize
 from scipy.optimize import NonlinearConstraint
+from import_data import numpy_csv_reader,computing_mean,make_positive_definite_sdp,r_covariance_matrix,is_positive_definite
 
 ### Importing the DATA ### 
-'''
-datas = []
-datas = import_data.numpy_csv_reader-("filename")
-'''
+
+[header, wind_data, pv_data, demand, times, n] = numpy_csv_reader("../data/wind_data_annual_matching_modified.csv","../data/pv_data_annual_matching_modified.csv","../data/demand_data_annual_matching_modified.csv")
+#[header, wind_data, pv_data, demand, times, n] = numpy_csv_reader("../data/wind_data_annual_matching.csv","../data/pv_data_annual_matching.csv","../data/demand_data_annual_matching.csv")
+
+
+r = computing_mean(wind_data,pv_data,n)
+d = np.mean(demand)
+sigma_d = np.sqrt(np.mean(np.diag(np.cov(demand,rowvar=False))))
+
+cov_r = r_covariance_matrix(wind_data,pv_data,n)
+print("n value is : ", n )
+print("cov_r is definite positive", is_positive_definite(cov_r), "\n")
+
 # TEMP/DEFAULT values #
 
-temp_n = 5
-temp_c_bar = 1
-temp_c_max = np.ones((2*temp_n,1))
-temp_mean_R = np.full((2*temp_n,1), 0.3)
-temp_D = np.full((2*temp_n,1),350)
-temp_mean_D = 350
-temp_sigma_D = 0.3 
 temp_epsilon = 0.1
-temp_cov_R = r = np.eye(2*temp_n,2*temp_n)
+temp_c_bar = 1
+temp_c_max = np.ones((2*n,1))
 
-def f_pconstraint(c, r = temp_mean_R, d = temp_mean_D, sigma_D = temp_sigma_D, epsilon = temp_epsilon, cov_R = temp_cov_R):
+
+def f_pconstraint(c, r = r, d = d, sigma_D = sigma_d, epsilon = temp_epsilon, cov_R = cov_r):
     return - c.T @ r + d - np.sqrt(c.T @ cov_R @ c + sigma_D ** 2) * norm.ppf(epsilon)  
 
 
-def cvxpy_solver(c_bar = temp_c_bar, c_max = temp_c_max, cov_R = temp_cov_R , r = temp_mean_R , sigma_D = temp_sigma_D , epsilon = temp_epsilon, d = temp_mean_D, n=temp_n):
+def cvxpy_solver(c_bar = temp_c_bar, c_max = temp_c_max, cov_R = cov_r , r = r , sigma_D = sigma_d , epsilon = temp_epsilon, d = d, n=n):
     # Quantile of standard normal distribution for the given epsilon
     phi_inv_epsilon = norm.ppf(epsilon)
 
@@ -42,12 +47,15 @@ def cvxpy_solver(c_bar = temp_c_bar, c_max = temp_c_max, cov_R = temp_cov_R , r 
     constraints = [ 
         c <= c_max,  # upper bound
         cp.sum(c) == c_bar,  # total capacity
+        #c.T @ r >= d -cp.sqrt(cp.quad_form(c,cov_R) + sigma_d **2 ) * phi_inv_epsilon # probalistic constraint 
     ]
 
     # Define and solve the problem
     problem = cp.Problem(objective, constraints)
     problem.solve()
     print("status:", problem.status)
+
+    return [c.value, problem.value]
 
     if (f_pconstraint(c.value) <= 0):
         # probalistic constraint is respected 
@@ -121,7 +129,7 @@ def demand_constraint(c, r, d, sigma_D, epsilon, cov_R):
 def total_capacity_constraint(c, c_bar):
     return c.sum() - c_bar
 
-def scipy_solver(c_bar = temp_c_bar, c_max = temp_c_max, cov_R = temp_cov_R , mean_R = temp_mean_R , sigma_D = temp_sigma_D , epsilon = temp_epsilon,mean_D = temp_mean_D, n=temp_n):
+def scipy_solver(c_bar = temp_c_bar, c_max = temp_c_max, cov_R = cov_r , mean_R = r , sigma_D = sigma_d , epsilon = temp_epsilon,mean_D = d, n=n):
     # Bounds
     bounds = [(0, c_max[i][0]) for i in range(2*n)]
 
@@ -148,13 +156,11 @@ start = time.time()
 [c_result, inf_value] = cvxpy_solver()
 end = time.time()
 
-print("Computing time : ", (end-start) * 10**3, "ms")'''
+print("Computing time for 2 stage optimization : ", (end-start) * 10**3, "ms \n")
 
 start = time.time()
 scipy_solver()
 end = time.time()
 
-print("Computing time : ", (end-start) * 10**3, "ms")
-
-### Solving the optimization problem ###
+print("Computing time for scipy solver with non linear constraint: ", (end-start) * 10**3, "ms")'''
 
