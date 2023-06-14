@@ -10,30 +10,43 @@ from import_data import numpy_csv_reader,computing_mean,make_positive_definite_s
 
 ### Importing the DATA ### 
 
-[header, wind_data, pv_data, demand, times, n] = numpy_csv_reader("../data/wind_data_annual_matching_modified.csv","../data/pv_data_annual_matching_modified.csv","../data/demand_data_annual_matching_modified.csv")
+#[header, wind_data, pv_data, demand, times, n] = numpy_csv_reader("../data/wind_data_annual_matching_modified.csv","../data/pv_data_annual_matching_modified.csv","../data/demand_data_annual_matching_modified.csv")
 #[header, wind_data, pv_data, demand, times, n] = numpy_csv_reader("../data/wind_data_annual_matching.csv","../data/pv_data_annual_matching.csv","../data/demand_data_annual_matching.csv")
 
-
+'''
 r = computing_mean(wind_data,pv_data,n)
 d = np.mean(demand)
 sigma_d = np.sqrt(np.mean(np.diag(np.cov(demand,rowvar=False))))
 
 cov_r = r_covariance_matrix(wind_data,pv_data,n)
 print("n value is : ", n )
-print("cov_r is definite positive", is_positive_definite(cov_r), "\n")
+print("cov_r is definite positive", is_positive_definite(cov_r), "\n")'''
 
-# TEMP/DEFAULT values #
+# TESTING VALUES #
+n = 10
 
-temp_epsilon = 0.1
-temp_c_bar = 1
-temp_c_max = np.ones((2*n,1))
+matrix = np.random.rand(2*n, 2*n)
+symmetric_matrix = matrix @ matrix.T
+eigenvalues, eigenvectors = np.linalg.eig(symmetric_matrix)
+positive_eigenvalues = np.maximum(eigenvalues, 0)
+cov_r = eigenvectors @ np.diag(positive_eigenvalues) @ eigenvectors.T
+
+d = np.random.randint(0, 10)
+sigma_d = np.random.randint(0, 10)
+r = np.random.rand(2*n, 1)
+
+### CONFIGURATION OF PARAMETERS ###
+
+epsilon = 0.1
+c_bar = 1
+c_max = np.ones((2*n,1))
 
 
-def f_pconstraint(c, r = r, d = d, sigma_D = sigma_d, epsilon = temp_epsilon, cov_R = cov_r):
+def f_pconstraint(c, r = r, d = d, sigma_D = sigma_d, epsilon = epsilon, cov_R = cov_r):
     return - c.T @ r + d - np.sqrt(c.T @ cov_R @ c + sigma_D ** 2) * norm.ppf(epsilon)  
 
 
-def cvxpy_solver(c_bar = temp_c_bar, c_max = temp_c_max, cov_R = cov_r , r = r , sigma_D = sigma_d , epsilon = temp_epsilon, d = d, n=n):
+def cvxpy_solver(c_bar = c_bar, c_max = c_max, cov_R = cov_r , r = r , sigma_D = sigma_d , epsilon = epsilon, d = d, n=n):
     # Quantile of standard normal distribution for the given epsilon
     phi_inv_epsilon = norm.ppf(epsilon)
 
@@ -54,13 +67,13 @@ def cvxpy_solver(c_bar = temp_c_bar, c_max = temp_c_max, cov_R = cov_r , r = r ,
     problem = cp.Problem(objective, constraints)
     problem.solve()
     print("status:", problem.status)
-
-    return [c.value, problem.value]
+    num_iterations = problem.solver_stats.num_iters
 
     if (f_pconstraint(c.value) <= 0):
         # probalistic constraint is respected 
         print("No probalistic constraint", end ='\n')
         print("c result = ", c.value , " and the value is ", problem.value, end ='\n')
+        print("\033[91mNumber of iterations : {}.\033[0m".format(num_iterations))
         return [c.value, problem.value]
     else :
         # otherwise, minimize the following objective function 
@@ -77,6 +90,7 @@ def cvxpy_solver(c_bar = temp_c_bar, c_max = temp_c_max, cov_R = cov_r , r = r ,
 
         print("Probalistic constraint", end ='\n')
         print("c result = \n", c_2.value , " and the value is ", c_2.value.T @ cov_R @ c_2.value, end ='\n')
+        print("\033[91mNumber of iterations : {}.\033[0m".format(num_iterations + problem_2.solver_stats.num_iters))
         return [c_2.value, problem_2.value]
         
 '''
@@ -129,7 +143,7 @@ def demand_constraint(c, r, d, sigma_D, epsilon, cov_R):
 def total_capacity_constraint(c, c_bar):
     return c.sum() - c_bar
 
-def scipy_solver(c_bar = temp_c_bar, c_max = temp_c_max, cov_R = cov_r , mean_R = r , sigma_D = sigma_d , epsilon = temp_epsilon,mean_D = d, n=n):
+def scipy_solver(c_bar = c_bar, c_max = c_max, cov_R = cov_r , mean_R = r , sigma_D = sigma_d , epsilon = epsilon,mean_D = d, n=n):
     # Bounds
     bounds = [(0, c_max[i][0]) for i in range(2*n)]
 
@@ -148,19 +162,19 @@ def scipy_solver(c_bar = temp_c_bar, c_max = temp_c_max, cov_R = cov_r , mean_R 
     print("Optimization success:", result.success)
     print("Objective function value:", result.fun)
     print("Termination message:", result.message)
-    print("Number of iterations:", result.nit)
+    print("\033[91mNumber of iterations : {}.\033[0m".format( result.nit))
 
+    return result.x
 
-'''
 start = time.time()
 [c_result, inf_value] = cvxpy_solver()
 end = time.time()
 
-print("Computing time for 2 stage optimization : ", (end-start) * 10**3, "ms \n")
+print("\033[92mComputing time for 2 stage optimization : {} ms \n \033[0m".format((end-start) * 10 **3))
 
-start = time.time()
+start2 = time.time()
 scipy_solver()
-end = time.time()
+end2= time.time()
 
-print("Computing time for scipy solver with non linear constraint: ", (end-start) * 10**3, "ms")'''
+print("\033[92mComputing time for scipy solver with non linear constraint : {} ms \n \033[0m".format((end2-start2) * 10 **3))
 

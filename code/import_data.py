@@ -2,7 +2,7 @@ import numpy as np
 import cvxpy as cp
 import csv
 import time 
-
+import matplotlib.pyplot as plt
 
 ### Importing the data ###
 
@@ -26,7 +26,7 @@ def numpy_csv_reader(file_path_wind, file_path_pv , file_path_demand, delimiter=
 
 ### Data formating process ###
 
-#[header, wind_data, pv_data, demand, times, n] = numpy_csv_reader("../data/wind_data_annual_matching_modified.csv","../data/pv_data_annual_matching_modified.csv","../data/demand_data_annual_matching_modified.csv")
+[header, wind_data, pv_data, demand, times, n] = numpy_csv_reader("../data/wind_data_annual_matching_modified.csv","../data/pv_data_annual_matching_modified.csv","../data/demand_data_annual_matching_modified.csv")
 
 
 def computing_mean(wind_data,pv_data, n):
@@ -125,3 +125,29 @@ def computing_RD_covariance(R_array, D_array):
     
     return RD_covariance
 
+def plot_country_data(data, save_path):
+    # Extract time and country columns
+    time = data[:, 0]
+    countries = data[:, 1:]
+
+    # Plot each country's data
+    for i, country in enumerate(countries.T):
+        plt.plot(country, label=data[0, i + 1])
+
+    # Customize the plot
+    plt.xlabel('Time')
+    plt.ylabel('Value')
+    plt.title('Country Data')
+    plt.legend()
+
+    # Set x-axis tick labels to time values
+    plt.xticks(range(len(time)), time, rotation='vertical')
+
+    # Save the plot as an image
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=300)  # Adjust dpi as needed
+
+    # Close the plot
+    plt.close()
+
+plot_country_data(wind_data, 'wind.png')
