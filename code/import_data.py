@@ -3,30 +3,33 @@ import cvxpy as cp
 import csv
 import time 
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+import matplotlib.dates as mdates
 
 ### Importing the data ###
 
 def numpy_csv_reader(file_path_wind, file_path_pv , file_path_demand, delimiter=',', dtype=float, skiprows=1):
 
-    # Read the CSV file to extract the headers
+    # Read the CSV file to extract the countries
     with open(file_path_wind, 'r') as f:
         reader = csv.reader(f, delimiter=delimiter)
-        headers = next(reader)
+        countries = next(reader)[1:] # Delete 'time' in our header
 
-    n = len(headers) - 1
+    n = len(countries) - 1
 
     # First column is an string type 
     times = np.loadtxt(file_path_wind, delimiter=delimiter, dtype=str, skiprows=skiprows, usecols=0)
 
     wind_data = np.loadtxt(file_path_wind, delimiter=delimiter, dtype=dtype, skiprows=skiprows, usecols=range(1, n+1))
-    pv_data = np.loadtxt(file_path_wind, delimiter=delimiter, dtype=dtype, skiprows=skiprows, usecols=range(1, n+1))
+    pv_data = np.loadtxt(file_path_pv, delimiter=delimiter, dtype=dtype, skiprows=skiprows, usecols=range(1, n+1))
     demand_data = np.loadtxt(file_path_demand, delimiter=delimiter, dtype=dtype, skiprows=skiprows, usecols=range(1, n+1))
 
-    return [headers, wind_data, pv_data, demand_data, times, n]
+    return [countries, wind_data, pv_data, demand_data, times, n]
 
 ### Data formating process ###
 
-[header, wind_data, pv_data, demand, times, n] = numpy_csv_reader("../data/wind_data_annual_matching_modified.csv","../data/pv_data_annual_matching_modified.csv","../data/demand_data_annual_matching_modified.csv")
+#[countries, wind_data, pv_data, demand, times, n] = numpy_csv_reader("../data/wind_data_annual_matching_modified.csv","../data/pv_data_annual_matching_modified.csv","../data/demand_data_annual_matching_modified.csv")
+[countries, wind_data, pv_data, demand_data, times, n] = numpy_csv_reader("../data/wind_data_annual_matching.csv","../data/pv_data_annual_matching.csv","../data/demand_data_annual_matching.csv")
 
 
 def computing_mean(wind_data,pv_data, n):
@@ -125,29 +128,52 @@ def computing_RD_covariance(R_array, D_array):
     
     return RD_covariance
 
-def plot_country_data(data, save_path):
-    # Extract time and country columns
-    time = data[:, 0]
-    countries = data[:, 1:]
+def plot_country_data(time, country_data, country_names, plot_title, yaxis_label, save_path=None):
+    
+    # Create a larger figure with adjusted width
+    plt.figure(figsize=(10, 6))  # Adjust the figure size as needed
 
-    # Plot each country's data
-    for i, country in enumerate(countries.T):
-        plt.plot(country, label=data[0, i + 1])
+    # Convert dates to 'YYYY' format only if the format is YYYY-MM-DD
+    years = [date[:4] for date in time]
+
+    # Define a list of marker shapes and colors
+    markers = ['o', 's', 'v', '^', 'D', 'p', '*', 'h', 'x']
+
+    # Plot each country's data with a unique color and shape
+    for i, country in enumerate(country_data.T):
+        marker = markers[i % len(markers)]  # Assign a marker from the list
+        plt.plot(years, country, marker=marker, label=country_names[i])
 
     # Customize the plot
-    plt.xlabel('Time')
-    plt.ylabel('Value')
-    plt.title('Country Data')
+    plt.xlabel('Year')
+    plt.ylabel(yaxis_label)
+    plt.title(plot_title)
     plt.legend()
+    plt.grid()
 
-    # Set x-axis tick labels to time values
-    plt.xticks(range(len(time)), time, rotation='vertical')
+    # Rotate the x-axis tick labels vertically
+    plt.xticks(rotation='vertical')
 
-    # Save the plot as an image
-    plt.tight_layout()
-    plt.savefig(save_path, dpi=300)  # Adjust dpi as needed
+    # Increase spacing between the years on the x-axis
+    plt.gca().xaxis.set_major_locator(ticker.MultipleLocator(5))  # Set the interval between labels to 5 years
+
+    # Format the y-axis values with spaced thousands separator
+    formatter = ticker.StrMethodFormatter('{x:,.2f}')
+    plt.gca().yaxis.set_major_formatter(formatter)
+
+    # Adjust the legend
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), ncol=1)
+
+    # Save the plot if save_path is provided
+    if save_path:
+        plt.savefig(save_path, dpi=500)  # Adjust dpi as needed
+
+    # Display the plot if save_path is not provided
+    if not save_path:
+        plt.tight_layout()
+        plt.show()
 
     # Close the plot
     plt.close()
 
-plot_country_data(wind_data, 'wind.png')
+plot_country_data(times, pv_data, countries, plot_title="pv data" , yaxis_label = "capacity factor", save_path = 'pv_yearly.png')
