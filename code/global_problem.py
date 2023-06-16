@@ -9,42 +9,55 @@ from scipy.optimize import NonlinearConstraint
 from import_data import numpy_csv_reader,computing_mean,make_positive_definite_sdp,r_covariance_matrix,is_positive_definite
 
 ### Importing the DATA ### 
-
-#[countries, wind_data, pv_data, demand, times, n] = numpy_csv_reader("../data/wind_data_annual_matching_modified.csv","../data/pv_data_annual_matching_modified.csv","../data/demand_data_annual_matching_modified.csv")
+'''
+[countries, wind_data, pv_data, demand, times, n] = numpy_csv_reader("../data/wind_data_annual_matching_modified.csv","../data/pv_data_annual_matching_modified.csv","../data/demand_data_annual_matching_modified.csv")
 #[countries, wind_data, pv_data, demand, times, n] = numpy_csv_reader("../data/wind_data_annual_matching.csv","../data/pv_data_annual_matching.csv","../data/demand_data_annual_matching.csv")
 
-'''
 r = computing_mean(wind_data,pv_data,n)
 d = np.mean(demand)
 sigma_d = np.sqrt(np.mean(np.diag(np.cov(demand,rowvar=False))))
 
 cov_r = r_covariance_matrix(wind_data,pv_data,n)
 print("n value is : ", n )
-print("cov_r is definite positive", is_positive_definite(cov_r), "\n")'''
-
+print("cov_r is definite positive", is_positive_definite(cov_r), "\n")
+'''
 # TESTING VALUES #
-n = 10
+
+n = 2
 
 matrix = np.random.rand(2*n, 2*n)
 symmetric_matrix = matrix @ matrix.T
 eigenvalues, eigenvectors = np.linalg.eig(symmetric_matrix)
 positive_eigenvalues = np.maximum(eigenvalues, 0)
 cov_r = eigenvectors @ np.diag(positive_eigenvalues) @ eigenvectors.T
+#cov_r = np.eye((2*n))
 
-d = np.random.randint(0, 10)
+'''d = np.random.randint(0, 10)
 sigma_d = np.random.randint(0, 10)
-r = np.random.rand(2*n, 1)
+r = np.random.rand(2*n, 1)'''
+
+d = 10
+sigma_d = 10
+r = np.ones((2*n, 1))
 
 ### CONFIGURATION OF PARAMETERS ###
 
 epsilon = 0.1
 c_bar = 1
-c_max = np.ones((2*n,1))
-
+#c_max = np.ones((2*n,1))
+c_max = np.full((2*n,1),1)
 
 def f_pconstraint(c, r = r, d = d, sigma_D = sigma_d, epsilon = epsilon, cov_R = cov_r):
     return - c.T @ r + d - np.sqrt(c.T @ cov_R @ c + sigma_D ** 2) * norm.ppf(epsilon)  
 
+def is_correctly_constrained(c, c_bar = c_bar, c_max = c_max, cov_R = cov_r , mean_R = r , sigma_D = sigma_d , epsilon = epsilon,mean_D = d, n=n ):
+    print("probalistic constrainte value : ", f_pconstraint(c), end='\n')
+    probalistic_bool = f_pconstraint(c = c) <= 0 
+    boundary_bool = np.all(c >= 0) and np.all(c <= c_max)
+    total_bool = np.allclose(c.sum(), c_bar)
+    print("Probalistic : ", probalistic_bool, " Boundary : " , boundary_bool, " Total : ", total_bool, end = '\n')
+    
+    return probalistic_bool and total_bool and boundary_bool
 
 def cvxpy_solver(c_bar = c_bar, c_max = c_max, cov_R = cov_r , r = r , sigma_D = sigma_d , epsilon = epsilon, d = d, n=n):
     # Quantile of standard normal distribution for the given epsilon
@@ -60,7 +73,6 @@ def cvxpy_solver(c_bar = c_bar, c_max = c_max, cov_R = cov_r , r = r , sigma_D =
     constraints = [ 
         c <= c_max,  # upper bound
         cp.sum(c) == c_bar,  # total capacity
-        #c.T @ r >= d -cp.sqrt(cp.quad_form(c,cov_R) + sigma_d **2 ) * phi_inv_epsilon # probalistic constraint 
     ]
 
     # Define and solve the problem
@@ -72,8 +84,10 @@ def cvxpy_solver(c_bar = c_bar, c_max = c_max, cov_R = cov_r , r = r , sigma_D =
     if (f_pconstraint(c.value) <= 0):
         # probalistic constraint is respected 
         print("No probalistic constraint", end ='\n')
-        print("c result = ", c.value , " and the value is ", problem.value, end ='\n')
+        print("c result = ", c.value , end ='\n')
         print("\033[91mNumber of iterations : {}.\033[0m".format(num_iterations))
+        print("Is correctly constrained : ", is_correctly_constrained(c = c.value), end ='\n')
+
         return [c.value, problem.value]
     else :
         # otherwise, minimize the following objective function 
@@ -89,7 +103,8 @@ def cvxpy_solver(c_bar = c_bar, c_max = c_max, cov_R = cov_r , r = r , sigma_D =
         problem_2.solve()
 
         print("Probalistic constraint", end ='\n')
-        print("c result = \n", c_2.value , " and the value is ", c_2.value.T @ cov_R @ c_2.value, end ='\n')
+        print("Is correctly constrained : ", is_correctly_constrained(c = c_2.value), end ='\n')
+        print("c result = \n", c_2.value , end ='\n')
         print("\033[91mNumber of iterations : {}.\033[0m".format(num_iterations + problem_2.solver_stats.num_iters))
         return [c_2.value, problem_2.value]
         
@@ -160,9 +175,10 @@ def scipy_solver(c_bar = c_bar, c_max = c_max, cov_R = cov_r , mean_R = r , sigm
 
     print("Optimized solution:", result.x)
     print("Optimization success:", result.success)
-    print("Objective function value:", result.fun)
     print("Termination message:", result.message)
     print("\033[91mNumber of iterations : {}.\033[0m".format( result.nit))
+    print("Is correctly constrained : ", is_correctly_constrained(c = result.x),end ='\n')
+
 
     return result.x
 
