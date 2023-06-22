@@ -5,13 +5,14 @@ import time
 import nlopt
 from scipy.stats import norm
 from scipy.optimize import minimize
-from scipy.optimize import NonlinearConstraint
+from scipy.optimize import NonlinearConstraint, LinearConstraint
 from import_data import numpy_csv_reader,computing_mean,make_positive_definite_sdp,r_covariance_matrix,is_positive_definite
+import random
 
 ### Importing the DATA ### 
-'''
+
 [countries, wind_data, pv_data, demand, times, n] = numpy_csv_reader("../data/wind_data_annual_matching_modified.csv","../data/pv_data_annual_matching_modified.csv","../data/demand_data_annual_matching_modified.csv")
-#[countries, wind_data, pv_data, demand, times, n] = numpy_csv_reader("../data/wind_data_annual_matching.csv","../data/pv_data_annual_matching.csv","../data/demand_data_annual_matching.csv")
+#[countries, wind_data, pv_data, demand, times, n] = numpy_csv_reader("../data/origina_data/wind_data_annual_matching.csv","../data/origina_data/pv_data_annual_matching.csv","../data/origina_data/demand_data_annual_matching.csv")
 
 r = computing_mean(wind_data,pv_data,n)
 d = np.mean(demand)
@@ -20,17 +21,22 @@ sigma_d = np.sqrt(np.mean(np.diag(np.cov(demand,rowvar=False))))
 cov_r = r_covariance_matrix(wind_data,pv_data,n)
 print("n value is : ", n )
 print("cov_r is definite positive", is_positive_definite(cov_r), "\n")
-'''
+
+[countries, max_wind_data, max_pv_data, _, _] = numpy_csv_reader("../data/max_capacities_wind_matching_modified.csv","../data/max_capacities_pv_matching_modified.csv", skip_first_col = False )
+c_max = np.zeros((2*n,1))
+c_max[:n, 0] = max_wind_data[:n] / 1000
+c_max[n:2*n, 0] = max_pv_data[:n] / 1000
+
 # TESTING VALUES #
 
-n = 2
+"""n = 2
 
 matrix = np.random.rand(2*n, 2*n)
 symmetric_matrix = matrix @ matrix.T
 eigenvalues, eigenvectors = np.linalg.eig(symmetric_matrix)
 positive_eigenvalues = np.maximum(eigenvalues, 0)
-cov_r = eigenvectors @ np.diag(positive_eigenvalues) @ eigenvectors.T
-#cov_r = np.eye((2*n))
+#cov_r = eigenvectors @ np.diag(positive_eigenvalues) @ eigenvectors.T
+cov_r = np.eye((2*n))
 
 '''d = np.random.randint(0, 10)
 sigma_d = np.random.randint(0, 10)
@@ -38,24 +44,23 @@ r = np.random.rand(2*n, 1)'''
 
 d = 10
 sigma_d = 10
-r = np.ones((2*n, 1))
+r = np.ones((2*n, 1))"""
 
 ### CONFIGURATION OF PARAMETERS ###
 
 epsilon = 0.1
 c_bar = 1
 #c_max = np.ones((2*n,1))
-c_max = np.full((2*n,1),1)
 
 def f_pconstraint(c, r = r, d = d, sigma_D = sigma_d, epsilon = epsilon, cov_R = cov_r):
     return - c.T @ r + d - np.sqrt(c.T @ cov_R @ c + sigma_D ** 2) * norm.ppf(epsilon)  
 
 def is_correctly_constrained(c, c_bar = c_bar, c_max = c_max, cov_R = cov_r , mean_R = r , sigma_D = sigma_d , epsilon = epsilon,mean_D = d, n=n ):
     print("probalistic constrainte value : ", f_pconstraint(c), end='\n')
-    probalistic_bool = f_pconstraint(c = c) <= 0 
+    probalistic_bool = f_pconstraint(c) <= 0 
     boundary_bool = np.all(c >= 0) and np.all(c <= c_max)
     total_bool = np.allclose(c.sum(), c_bar)
-    print("Probalistic : ", probalistic_bool, " Boundary : " , boundary_bool, " Total : ", total_bool, end = '\n')
+    print("Probalistic : ", probalistic_bool, " |  Boundary : " , boundary_bool, " | Total : ", total_bool, end = '\n')
     
     return probalistic_bool and total_bool and boundary_bool
 
@@ -80,10 +85,10 @@ def cvxpy_solver(c_bar = c_bar, c_max = c_max, cov_R = cov_r , r = r , sigma_D =
     problem.solve()
     print("status:", problem.status)
     num_iterations = problem.solver_stats.num_iters
+    print("First pconstraint value : ", f_pconstraint(c.value))
 
     if (f_pconstraint(c.value) <= 0):
         # probalistic constraint is respected 
-        print("No probalistic constraint", end ='\n')
         print("c result = ", c.value , end ='\n')
         print("\033[91mNumber of iterations : {}.\033[0m".format(num_iterations))
         print("Is correctly constrained : ", is_correctly_constrained(c = c.value), end ='\n')
@@ -107,77 +112,60 @@ def cvxpy_solver(c_bar = c_bar, c_max = c_max, cov_R = cov_r , r = r , sigma_D =
         print("c result = \n", c_2.value , end ='\n')
         print("\033[91mNumber of iterations : {}.\033[0m".format(num_iterations + problem_2.solver_stats.num_iters))
         return [c_2.value, problem_2.value]
-        
-'''
-
-def f(x, grad, cov_R = temp_cov_R):
-    if grad.size > 0 : 
-        grad[:] = cov_R @ x 
-    return x @ cov_R @ x
-
-def constraint(x,grad, r = temp_mean_R, d = temp_mean_D, sigma_D = temp_sigma_D, epsilon = temp_epsilon, cov_R = temp_cov_R):
-    if grad.size > 0 : 
-        grad[:] = - cov_R @ x - cov_R @ x / np.sqrt( x @ cov_R @ x )
-    return  - x @ r + d - np.sqrt(d @ cov_R @ d + sigma_D ** 2) * norm.ppf(epsilon)  
-
-def nlopt_solver(c_bar = temp_c_bar, c_max = temp_c_max, cov_R = temp_cov_R , mean_R = temp_mean_R , sigma_D = temp_sigma_D , epsilon = temp_epsilon,mean_D = temp_mean_D, n=temp_n):
-
-    # Initialize the optimizer
-    opt = nlopt.opt(nlopt.LD_MMA, 2 * n)  # 2n is the dimension of the problem
-
-    # Set the objective function
-    opt.set_min_objective(f)
-
-    # Set the constraints
-    opt.add_inequality_constraint(constraint, 1e-8)
-
-    # Set the lower and upper bounds for the capacities
-    lower_bounds = np.zeros((2 * n, 1)) # Replace with actual lower bounds
-    upper_bounds = np.ones((2 * n,1))   # Replace with actual upper bounds
-    opt.set_lower_bounds(lower_bounds)
-    opt.set_upper_bounds(upper_bounds)
-
-    # Set the initial guess
-    x = np.ones(2 * n)  # Replace with an actual initial guess
-
-    # Optimize
-    x_opt = opt.optimize(x)
-    minf = opt.last_optimum_value()
-
-    print("optimal value =", minf)
-    print("optimal x =", x_opt)
-
-    '''
 
 def objective(c, cov_R):
     return c @ cov_R @ c
 
 def demand_constraint(c, r, d, sigma_D, epsilon, cov_R):
-    return c @ r - d + np.sqrt(c @ cov_R @ c + sigma_D ** 2) * norm.ppf(epsilon)  
+    return - c @ r + d - np.sqrt(c @ cov_R @ c + sigma_D ** 2) * norm.ppf(epsilon)  
 
 def total_capacity_constraint(c, c_bar):
     return c.sum() - c_bar
+
+def best_initial_guess(r = r,n = n , k = 4 , c_max = c_max, c_bar = c_bar):
+
+    c0 = np.zeros(2*n)
+
+    max_indices = np.argpartition(r, -k)[-k:]  # Get the indices of the k largest values
+
+    for i in max_indices : 
+        c0[i] = c_max[i]
+    
+    total_sum = np.sum(c0)
+    c0 *= c_bar / total_sum
+
+    return c0
 
 def scipy_solver(c_bar = c_bar, c_max = c_max, cov_R = cov_r , mean_R = r , sigma_D = sigma_d , epsilon = epsilon,mean_D = d, n=n):
     # Bounds
     bounds = [(0, c_max[i][0]) for i in range(2*n)]
 
     # Constraints
-    con1 = {'type': 'eq', 'fun': lambda c: total_capacity_constraint(c, c_bar)}
+
+    coefficients = np.ones((1, 2*n))
+    con1 = LinearConstraint(coefficients, [c_bar], [c_bar])
     con2 = NonlinearConstraint(lambda c: demand_constraint(c, mean_R, mean_D, sigma_D, epsilon,cov_R), -np.inf, 0)
     cons = ([con1,con2])
 
-    # Initial guess
-    c0 = np.full(2*n,1/n)
 
-    # Optimization
-    result = minimize(objective, c0, args=(cov_R), constraints=cons, bounds=bounds, method="SLSQP",tol=1e-6)
+    # Generate random initial guess
+    #c0 = [random.uniform(0, 1) for _ in range(2 * n)]
 
-    print("Optimized solution:", result.x)
-    print("Optimization success:", result.success)
-    print("Termination message:", result.message)
-    print("\033[91mNumber of iterations : {}.\033[0m".format( result.nit))
-    print("Is correctly constrained : ", is_correctly_constrained(c = result.x),end ='\n')
+    # Intial guess : Allocate regarding the maximum of capcities factor 
+    c0 = best_initial_guess(k = n)
+    
+    # Optimization : 'trust-constr', 'SLSQP' are the only methods that can handle nonlinear trust-constr and equality constraints
+    result = minimize(objective, c0, args=(cov_R), constraints=cons, bounds=bounds, method="SLSQP",  options={'maxiter': 1000, 'ftol': 1e-8})
+
+    if (result.success):
+        print("Optimized solution:", result.x)
+        print("\033[91mNumber of iterations : {}.\033[0m".format(result.nit), end ='\n')
+    else: 
+        print("Optimization success:", result.success)
+        print("Termination message:", result.message)
+        print("Demand constraint violation:", demand_constraint(result.x, mean_R, mean_D, sigma_D, epsilon,cov_R))
+        print("Total sum violation:", total_capacity_constraint(result.x, c_bar))
+        #print("Is correctly constrained : ", is_correctly_constrained(c = result.x),end ='\n')
 
 
     return result.x

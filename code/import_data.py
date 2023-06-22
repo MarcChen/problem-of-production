@@ -5,12 +5,13 @@ import time
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import matplotlib.dates as mdates
+import matplotlib.transforms as mtrans
 import pandas as pd
 import seaborn as sns
 
 ### Importing the data ###
 
-def numpy_csv_reader(file_path_wind, file_path_pv , file_path_demand, delimiter=',', dtype=float, skiprows=1):
+def numpy_csv_reader(file_path_wind, file_path_pv , file_path_demand = None , delimiter=',', dtype=float, skiprows=1, skip_first_col = True ):
 
     # Read the CSV file to extract the countries
     with open(file_path_wind, 'r') as f:
@@ -18,20 +19,23 @@ def numpy_csv_reader(file_path_wind, file_path_pv , file_path_demand, delimiter=
         countries = next(reader)[1:] # Delete 'time' in our header
 
     n = len(countries) 
-
+    
     # First column is an string type 
     times = np.loadtxt(file_path_wind, delimiter=delimiter, dtype=str, skiprows=skiprows, usecols=0)
 
-    wind_data = np.loadtxt(file_path_wind, delimiter=delimiter, dtype=dtype, skiprows=skiprows, usecols=range(1, n+1))
-    pv_data = np.loadtxt(file_path_pv, delimiter=delimiter, dtype=dtype, skiprows=skiprows, usecols=range(1, n+1))
-    demand_data = np.loadtxt(file_path_demand, delimiter=delimiter, dtype=dtype, skiprows=skiprows, usecols=range(1, n+1))
+    if skip_first_col == True : 
+        wind_data = np.loadtxt(file_path_wind, delimiter=delimiter, dtype=dtype, skiprows=skiprows, usecols=range(1, n+1))
+        pv_data = np.loadtxt(file_path_pv, delimiter=delimiter, dtype=dtype, skiprows=skiprows, usecols=range(1, n+1))
+    else : 
+        wind_data = np.loadtxt(file_path_wind, delimiter=delimiter, dtype=dtype, skiprows=skiprows)
+        pv_data = np.loadtxt(file_path_pv, delimiter=delimiter, dtype=dtype, skiprows=skiprows)
+    
+    if file_path_demand is None : 
+        return [countries, wind_data, pv_data, times, n]
+    else : 
+        demand_data = np.loadtxt(file_path_demand, delimiter=delimiter, dtype=dtype, skiprows=skiprows, usecols=range(1, n+1))
+        return [countries, wind_data, pv_data, demand_data, times, n]
 
-    return [countries, wind_data, pv_data, demand_data, times, n]
-
-### Data formating process ###
-
-#[countries, wind_data, pv_data, demand, times, n] = numpy_csv_reader("../data/wind_data_annual_matching_modified.csv","../data/pv_data_annual_matching_modified.csv","../data/demand_data_annual_matching_modified.csv")
-#[countries, wind_data, pv_data, demand_data, times, n] = numpy_csv_reader("../data/wind_data_annual_matching.csv","../data/pv_data_annual_matching.csv","../data/demand_data_annual_matching.csv")
 
 
 def computing_mean(wind_data,pv_data, n):
@@ -46,6 +50,23 @@ def computing_mean(wind_data,pv_data, n):
     r = np.concatenate((r1, r2), axis=0)
     return r
 
+def generate_non_definite_positive_matrix(n):
+    # Generate a random symmetric matrix
+    A = np.random.rand(n, n)
+    A = 0.5 * (A + A.T)
+    
+    # Calculate the eigenvalues and eigenvectors
+    eigvals, eigvecs = np.linalg.eig(A)
+    
+    # Set some of the eigenvalues to negative values
+    num_negative = n // 2  # Number of negative eigenvalues
+    neg_indices = np.random.choice(n, num_negative, replace=False)
+    eigvals[neg_indices] = -eigvals[neg_indices]
+    
+    # Reconstruct the matrix using the modified eigenvalues and eigenvectors
+    A = eigvecs @ np.diag(eigvals) @ eigvecs.T
+    
+    return A
 def make_positive_definite(matrix, epsilon=1e-6):
     start=time.time()
     # Compute the eigenvalues and eigenvectors
@@ -79,25 +100,50 @@ def make_positive_definite_sdp(matrix):
     problem.solve()
     end = time.time()
     #print("sdp status:", problem.status)
+    # Print the solver used
+    #print(problem.solver_stats.solver_name)
+
     print("\033[92msdp : {} ms\033[0m".format((end-start) * 10 **3))
 
-    # Return the solution
-    return X.value
+    if problem.status == 'optimal':
+        return X.value
+    else: 
+        print("\033[91msdp method infeasible\033[0m")
+        return None
 
 
 def is_positive_definite(M):
+    if M is None :
+        return False
+    else :
+        eigenvalues = np.linalg.eigvalsh(M)
 
-    eigenvalues = np.linalg.eigvalsh(M)
+        # Check if all eigenvalues are strictly greater than zero
+        is_positive_definite = np.all(eigenvalues >= 0)
 
-    # Check if all eigenvalues are strictly greater than zero
-    is_positive_definite = np.all(eigenvalues >= 0)
+        return is_positive_definite
 
-    return is_positive_definite
+"""n = 60
+print("n value is {}".format(n))
+A = generate_non_definite_positive_matrix(n)
+print(" A is positive definite", is_positive_definite(A))
+B = make_positive_definite(A)
+print(is_positive_definite(B))
+C = make_positive_definite_sdp(A)
+while is_positive_definite(C) == False : 
+    A = generate_non_definite_positive_matrix(n)
+    C = make_positive_definite_sdp(A)
+print("Is definite positive : ", is_positive_definite(C))
+error_matrix = np.abs(B - A)
+mean_error = np.mean(np.diag(error_matrix))
+error_matrix2 = np.abs(C - A)
+mean_error2 = np.mean(np.diag(error_matrix2))
+print("L'erreur clipping : ", mean_error, " et l'erreur sdp : ", mean_error2)"""
 
 def r_covariance_matrix(wind_data,pv_data,n):
 
     cov_r = np.cov(pv_data, wind_data,rowvar=False)
-
+    return make_positive_definite(cov_r)
     if is_positive_definite(cov_r) :
         return cov_r
     else:
@@ -110,22 +156,12 @@ def r_covariance_matrix(wind_data,pv_data,n):
         print("sdp is definite positive", is_positive_definite(make_positive_definite_sdp(cov_r)))         '''
 
         sdp = make_positive_definite_sdp(cov_r)
-
         if is_positive_definite(sdp):
             print("\033[91mchosed sdp method.\033[0m")
             return sdp
         else:
             print("\033[91mchosed clipping method.\033[0m")
             return make_positive_definite(cov_r)
-
-#[countries, wind_data, pv_data, demand, times, n] = numpy_csv_reader("../data/wind_data_annual_matching_modified.csv","../data/pv_data_annual_matching_modified.csv","../data/demand_data_annual_matching_modified.csv")
-[countries, wind_data, pv_data, demand, times, n] = numpy_csv_reader("../data/wind_data_annual_matching.csv","../data/pv_data_annual_matching.csv","../data/demand_data_annual_matching.csv")
-
-r = computing_mean(wind_data,pv_data,n)
-d = np.mean(demand)
-sigma_d = np.sqrt(np.mean(np.diag(np.cov(demand,rowvar=False))))
-
-cov_r = r_covariance_matrix(wind_data,pv_data,n)
 
 def computing_RD_covariance(wind_data, pv_data, d_data):
     
@@ -135,9 +171,8 @@ def computing_RD_covariance(wind_data, pv_data, d_data):
     
     return wind_cov_demand, pv_cov_demand
 
-#wind_cov_demand, pv_cov_demand = computing_RD_covariance(wind_data,pv_data, demand_data)
 
-def plot_heatmap(data, x_labels, y_labels, cmap='hot', save_path=None, title=None):
+def plot_heatmap(data, x_labels, y_labels, cmap='coolwarm', save_path=None, title=None):
     """
     Function to plot a heatmap using Matplotlib.
 
@@ -154,8 +189,8 @@ def plot_heatmap(data, x_labels, y_labels, cmap='hot', save_path=None, title=Non
 
     # Create a heatmap
     cax = ax.imshow(data, cmap=cmap)
-
-    # Find the intervals at which to place the x and y labels
+    
+    """# Find the intervals at which to place the x and y labels
     x_interval = data.shape[1] / len(x_labels)
     y_interval = data.shape[0] / len(y_labels)
 
@@ -163,7 +198,17 @@ def plot_heatmap(data, x_labels, y_labels, cmap='hot', save_path=None, title=Non
     ax.set_xticks(np.arange(x_interval / 2, data.shape[1], x_interval))
     ax.set_yticks(np.arange(y_interval / 2, data.shape[0], y_interval))
     ax.set_xticklabels(x_labels)
-    ax.set_yticklabels(y_labels)
+    ax.set_yticklabels(y_labels)"""
+
+    # Define the interval for displaying x and y labels
+    x_label_interval = 2
+    y_label_interval = 2
+
+    # Set labels for the x and y axes at the defined intervals
+    ax.set_xticks(np.arange(0, data.shape[1], x_label_interval))
+    ax.set_yticks(np.arange(0, data.shape[0], y_label_interval))
+    ax.set_xticklabels(x_labels[::x_label_interval])
+    ax.set_yticklabels(y_labels[::y_label_interval])
 
     # Rotate the x labels and set their alignment
     plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
@@ -178,7 +223,54 @@ def plot_heatmap(data, x_labels, y_labels, cmap='hot', save_path=None, title=Non
 
     # Save the plot if a save path is provided
     if save_path is not None:
-        plt.savefig(save_path)
+        plt.savefig(save_path, dpi=400)
+    else:
+        plt.show()
+
+def plot_text_heatmap(data, x_labels, y_labels, cmap='coolwarm', save_path=None, title=None):
+    """
+    Function to plot a heatmap using Seaborn.
+
+    Parameters:
+    - data: 2D numpy array to plot
+    - x_labels: labels for the x axis (list or array-like)
+    - y_labels: labels for the y axis (list or array-like)
+    - cmap: colormap to use for the heatmap (string, optional)
+    - save_path: path to save the plot (string, optional)
+    - title: title for the plot (string, optional)
+    """
+
+    plt.figure(figsize=(10, 10))
+    sns.set(font_scale=1.5)
+    hm = sns.heatmap(data,
+                     cbar=True,
+                     annot=True,
+                     square=True,
+                     fmt='.1e',
+                     annot_kws={'size': 8},
+                     yticklabels=y_labels,
+                     xticklabels=x_labels)
+
+    plt.title(title if title is not None else 'Heatmap')
+    plt.tight_layout()
+
+    # Create a legend for the two sets of labels
+    legend_labels = ['Wind', 'PV']
+    legend_colors = ['blue', 'red']
+    legend_handles = [plt.Rectangle((0, 0), 1, 1, color=color) for color in legend_colors]
+    plt.legend(legend_handles, legend_labels)
+
+    # Set color for x-axis labels
+    half = len(x_labels) // 2
+    for i, xtick in enumerate(hm.get_xticklabels()):
+        xtick.set_color('blue' if i < half else 'red')
+
+    # Set color for y-axis labels
+    for i, ytick in enumerate(hm.get_yticklabels()):
+        ytick.set_color('blue' if i < half else 'red')
+
+    if save_path is not None:
+        plt.savefig(save_path, dpi = 500)
     else:
         plt.show()
 
@@ -294,7 +386,17 @@ def plot_histograms_column(country_data, country_names, xlabel, type_of_data, sa
         
         plt.show()
 
-#plot_heatmap(cov_r, countries, countries, save_path=f'../data/plots/heatmap_wind_and_pv_n={n}.png', title=f'R Covariance Heatmap (n={n})')
+[countries, wind_data, pv_data, demand, times, n] = numpy_csv_reader("../data/wind_data_annual_matching_modified.csv","../data/pv_data_annual_matching_modified.csv","../data/demand_data_annual_matching_modified.csv")
+#[countries, wind_data, pv_data, demand, times, n] = numpy_csv_reader("../data/wind_data_annual_matching.csv","../data/pv_data_annual_matching.csv","../data/demand_data_annual_matching.csv")
+
+r = computing_mean(wind_data,pv_data,n)
+d = np.mean(demand)
+sigma_d = np.sqrt(np.mean(np.diag(np.cov(demand,rowvar=False))))
+
+cov_r = r_covariance_matrix(wind_data,pv_data,n)
+
+#plot_heatmap(cov_r, 2*countries, 2*countries, save_path=f'../data/plots/heatmap_wind_and_pv_not_positive_definite_n={n}.png', title=f'R Covariance Heatmap ( not definite positive | n={n})', cmap="plasma")
+plot_text_heatmap(cov_r, 2*countries, 2*countries, save_path=f'../data/plots/heatmap_wind_and_pv_clipping_n={n}.png', title=f'R Covariance Heatmap ( clipping method | n={n})', cmap="plasma")
 #plot_country_data(times, pv_data, countries, plot_title="pv data" , yaxis_label = "capacity factor", save_path = '../data/plots/pv_yearly.png')
 #plot_histograms(country_data= pv_data, country_names=countries, xlabel="Pv capacity factor", type_of_data="pv", save_path="../data/histograms")
 #plot_histograms_column(country_data= pv_data, country_names=countries, xlabel="Pv capacity factor", type_of_data="pv", save_path="../data/histograms")

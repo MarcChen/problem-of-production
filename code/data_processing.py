@@ -2,9 +2,11 @@ import pandas as pd
 
 # Provide the paths for input and output files
 
-wind = '../data/wind_data_annual.csv'
-pv = '../data/pv_data_annual.csv'
-demand = '../data/demand_data_annual.csv'
+wind = '../data/original_data/wind_data_annual.csv'
+pv = '../data/original_data/pv_data_annual.csv'
+demand = '../data/original_data/demand_data_annual.csv'
+wind_max = '../data/original_data/max_capacities_wind.csv'
+pv_max = '../data/original_data/max_capacities_pv.csv'
 
 def aggregate_data_daily(input_file, output_file):
     # Read the CSV file
@@ -58,33 +60,48 @@ def sort_csv_column(input_file):
     # Save the sorted DataFrame to a new CSV file
     sorted_df.to_csv(file_matching, index=False)
 
-def keep_matching_columns(file1, file2, file3):
+def keep_matching_columns(file1, file2, file3, file4, file5):
     # Read the CSV files into pandas DataFrames
     df1 = pd.read_csv(file1)
     df2 = pd.read_csv(file2)
     df3 = pd.read_csv(file3)
-    
-    # Get the common columns present in all three DataFrames
-    common_columns = sorted(set(df1.columns) & set(df2.columns) & set(df3.columns))
-    
-    # Ensure "time" column is the first column
-    common_columns.remove("time")
-    common_columns = ["time"] + common_columns
+    df4 = pd.read_csv(file4)
+    df5 = pd.read_csv(file5)
+
+    # Get the common columns present in all five DataFrames
+    common_columns = sorted(set(df1.columns) & set(df2.columns) & set(df3.columns) & set(df4.columns) & set(df5.columns))
+
+    # Ensure "time" column is the first column for the first three DataFrames cause last two doesn't have time columns 
+    if "time" in common_columns:
+        common_columns.remove("time")
+        common_columns = ["time"] + common_columns
 
     # Save each DataFrame with only the common columns as a separate file
-    df1_common = df1[list(common_columns)]
-    df2_common = df2[list(common_columns)]
-    df3_common = df3[list(common_columns)]
-    
+    df1_common = df1[list(["time"] + common_columns)]
+    df2_common = df2[list(["time"] + common_columns)]
+    df3_common = df3[list(["time"] + common_columns)]
+    df4_common = df4[list(common_columns)]
+    df5_common = df5[list(common_columns)]
+
     # Modify the file names with "_matching" before the extension
     file1_matching = file1.replace(".csv", "_matching.csv")
     file2_matching = file2.replace(".csv", "_matching.csv")
     file3_matching = file3.replace(".csv", "_matching.csv")
+    file4_matching = file4.replace(".csv", "_matching.csv")
+    file5_matching = file5.replace(".csv", "_matching.csv")
 
-    # Writing the data 
+    file1_matching = file1_matching.replace("data/original_data/", "data/")
+    file2_matching = file2_matching.replace("data/original_data/", "data/")
+    file3_matching = file3_matching.replace("data/original_data/", "data/")
+    file4_matching = file4_matching.replace("data/original_data/", "data/")
+    file5_matching = file5_matching.replace("data/original_data/", "data/")
+
+    # Writing the data
     df1_common.to_csv(file1_matching, index=False)
     df2_common.to_csv(file2_matching, index=False)
     df3_common.to_csv(file3_matching, index=False)
+    df4_common.to_csv(file4_matching, index=False)
+    df5_common.to_csv(file5_matching, index=False)
 
 def delete_last_columns(input_file, n):
     # Read the input CSV file using pandas
@@ -108,11 +125,13 @@ def delete_last_columns(input_file, n):
 #sort_csv_column(pv)
 #sort_csv_column(demand)
 
-#keep_matching_columns(wind,pv,demand)
+#keep_matching_columns(wind,pv,demand,pv_max,wind_max)
 
 
-k = 15 # n - k localization 
+k = 18 # n=26 - k localization 
 
 delete_last_columns('../data/demand_data_annual_matching.csv',k)
 delete_last_columns('../data/pv_data_annual_matching.csv',k)
 delete_last_columns('../data/wind_data_annual_matching.csv',k)
+delete_last_columns('../data/max_capacities_wind_matching.csv',k)
+delete_last_columns('../data/max_capacities_pv_matching.csv',k)
