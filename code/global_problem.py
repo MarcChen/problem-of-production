@@ -9,11 +9,15 @@ from scipy.optimize import NonlinearConstraint, LinearConstraint
 from import_data import numpy_csv_reader,computing_mean,make_positive_definite_sdp,r_covariance_matrix,is_positive_definite
 import random
 import matplotlib.pyplot as plt 
+from plot_data import draw_map_plot_2
 
 ### Importing the DATA ### 
 
 [countries, wind_data, pv_data, demand, times, n] = numpy_csv_reader("../data/wind_data_annual_matching_modified.csv","../data/pv_data_annual_matching_modified.csv","../data/demand_data_annual_matching_modified.csv")
-#[countries, wind_data, pv_data, demand, times, n] = numpy_csv_reader("../data/origina_data/wind_data_annual_matching.csv","../data/origina_data/pv_data_annual_matching.csv","../data/origina_data/demand_data_annual_matching.csv")
+[countries, max_wind_data, max_pv_data, _, _] = numpy_csv_reader("../data/max_capacities_wind_matching_modified.csv","../data/max_capacities_pv_matching_modified.csv", skip_first_col = False )
+
+""" [countries, wind_data, pv_data, demand, times, n] = numpy_csv_reader("../data/wind_data_annual_matching.csv","../data/pv_data_annual_matching.csv","../data/demand_data_annual_matching.csv")
+[countries, max_wind_data, max_pv_data, _, _] = numpy_csv_reader("../data/max_capacities_wind_matching.csv","../data/max_capacities_pv_matching.csv", skip_first_col = False ) """
 
 r = computing_mean(wind_data,pv_data,n)
 d = np.mean(demand)
@@ -23,7 +27,6 @@ cov_r = r_covariance_matrix(wind_data,pv_data,n)
 print("n value is : ", n )
 #print("cov_r is definite positive", is_positive_definite(cov_r), "\n")
 
-[countries, max_wind_data, max_pv_data, _, _] = numpy_csv_reader("../data/max_capacities_wind_matching_modified.csv","../data/max_capacities_pv_matching_modified.csv", skip_first_col = False )
 c_max = np.zeros((2*n,1))
 c_max[:n, 0] = max_wind_data[:n] 
 c_max[n:2*n, 0] = max_pv_data[:n] 
@@ -231,7 +234,7 @@ end = time.time()
 
 print("\033[92mComputing time for 2 stage optimization : {} ms \n \033[0m".format((end-start) * 10 **3))
 
-### Simulation 
+""" ### Simulation 
 
 mean_capcities_wind = np.mean(wind_data)
 mean_capcities_pv = np.mean(pv_data)
@@ -261,7 +264,13 @@ plt.ylabel('Frequency')
 plt.title('Simulation results with c*')
 
 # Save plot as image file
-plt.savefig('simulation_results_c*.png')
+plt.savefig('simulation_results_c*.png') """
+
+data_dir="../data/map/"
+path_rg="NUTS_RG_01M_2021_3035_LEVL_0.json"
+path_bn="NUTS_BN_01M_2021_3035_LEVL_0.json"
+
+draw_map_plot_2(data_dir, path_rg, path_bn, c_max, c_result, n, countries, dpi = 500 , save_path = "../data/plots/europe_map_n={}.png".format(n))
 
 
 """start2 = time.time()

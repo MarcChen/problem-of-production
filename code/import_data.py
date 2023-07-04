@@ -17,15 +17,15 @@ def numpy_csv_reader(file_path_wind, file_path_pv , file_path_demand = None , de
         reader = csv.reader(f, delimiter=delimiter)
         countries = next(reader)[1:] # Delete 'time' in our header
 
-    n = len(countries) 
-    
     # First column is an string type 
     times = np.loadtxt(file_path_wind, delimiter=delimiter, dtype=str, skiprows=skiprows, usecols=0)
 
     if skip_first_col == True : 
+        n = len(countries) - 1
         wind_data = np.loadtxt(file_path_wind, delimiter=delimiter, dtype=dtype, skiprows=skiprows, usecols=range(1, n+1))
         pv_data = np.loadtxt(file_path_pv, delimiter=delimiter, dtype=dtype, skiprows=skiprows, usecols=range(1, n+1))
     else : 
+        n = len(countries) 
         wind_data = np.loadtxt(file_path_wind, delimiter=delimiter, dtype=dtype, skiprows=skiprows)
         pv_data = np.loadtxt(file_path_pv, delimiter=delimiter, dtype=dtype, skiprows=skiprows)
     
