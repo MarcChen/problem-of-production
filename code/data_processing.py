@@ -127,8 +127,8 @@ def delete_last_columns(input_file, n):
 
 #keep_matching_columns(wind,pv,demand,pv_max,wind_max)
 
-
-k = 18 # n=26 - k localization 
+# 1 < k < 24 
+k = 18 # n = 24 - k localization 
 
 delete_last_columns('../data/demand_data_annual_matching.csv',k)
 delete_last_columns('../data/pv_data_annual_matching.csv',k)

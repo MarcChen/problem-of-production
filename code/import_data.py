@@ -1,7 +1,6 @@
 import numpy as np 
 import cvxpy as cp
 import csv
-import time 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import matplotlib.dates as mdates
@@ -68,7 +67,6 @@ def generate_non_definite_positive_matrix(n):
     
     return A
 def make_positive_definite(matrix, epsilon=1e-6):
-    start=time.time()
     # Compute the eigenvalues and eigenvectors
     eigenvalues, eigenvectors = np.linalg.eigh(matrix)
 
@@ -77,12 +75,9 @@ def make_positive_definite(matrix, epsilon=1e-6):
 
     # Recompute the matrix with the new eigenvalues
     positive_definite_matrix = eigenvectors @ np.diag(eigenvalues) @ eigenvectors.T
-    end = time.time()
-    print("\033[92mclipping time : {} ms\033[0m".format((end-start) * 10 **3))
     return positive_definite_matrix
 
 def make_positive_definite_sdp(matrix):
-    start = time.time()
     matrix += np.eye(matrix.shape[0]) * 1e-5
     # Create a variable to represent the positive definite matrix
     X = cp.Variable(matrix.shape, symmetric=True)
@@ -98,12 +93,9 @@ def make_positive_definite_sdp(matrix):
     # Define and solve the problem
     problem = cp.Problem(objective, constraints)
     problem.solve()
-    end = time.time()
     #print("sdp status:", problem.status)
     # Print the solver used
     #print(problem.solver_stats.solver_name)
-
-    print("\033[92msdp : {} ms\033[0m".format((end-start) * 10 **3))
 
     if problem.status == 'optimal':
         return X.value
@@ -123,7 +115,7 @@ def is_positive_definite(M):
 
         return is_positive_definite
 
-"""n = 60
+"""n = 100
 print("n value is {}".format(n))
 A = generate_non_definite_positive_matrix(n)
 print(" A is positive definite", is_positive_definite(A))
@@ -138,17 +130,16 @@ error_matrix = np.abs(B - A)
 mean_error = np.mean(np.diag(error_matrix))
 error_matrix2 = np.abs(C - A)
 mean_error2 = np.mean(np.diag(error_matrix2))
-print("L'erreur clipping : ", mean_error, " et l'erreur sdp : ", mean_error2)"""
-
+print("L'erreur clipping : ", mean_error, " et l'erreur sdp : ", mean_error2)
+"""
 def r_covariance_matrix(wind_data,pv_data,n):
 
     cov_r = np.cov(pv_data, wind_data,rowvar=False)
-    return make_positive_definite(cov_r)
     if is_positive_definite(cov_r) :
         return cov_r
     else:
         # Variances can't be changed, turning cov_r into a positive definite one 
-        print("Covariance matrix isn't definite positive ! \n")
+        #print("Covariance matrix isn't definite positive ! \n")
         '''
         print("Clipping value : \n", np.absolute(cov_r - make_positive_definite(cov_r)), " \n")
         print("clipping is definite positive", is_positive_definite(make_positive_definite(cov_r)))
@@ -163,13 +154,22 @@ def r_covariance_matrix(wind_data,pv_data,n):
             print("\033[91mchosed clipping method.\033[0m")
             return make_positive_definite(cov_r)
 
-def computing_RD_covariance(wind_data, pv_data, d_data):
+def correlation_matrix(wind_data, pv_data, n):
     
-    # Compute the covariance matrix for RD
-    wind_cov_demand = np.cov(wind_data,d_data, rowvar=False)
-    pv_cov_demand = np.cov(pv_data,d_data, rowvar=False)
-    
-    return wind_cov_demand, pv_cov_demand
+    corr = np.corrcoef(pv_data, wind_data,rowvar=False)
+    if is_positive_definite(corr) :
+        return corr
+    else:
+        # Variances can't be changed, turning corr into a positive definite one 
+        #print("Covariance matrix isn't definite positive ! \n")
+
+        sdp = make_positive_definite_sdp(corr)
+        if is_positive_definite(corr):
+            print("\033[91mchosed sdp method.\033[0m")
+            return corr
+        else:
+            print("\033[91mchosed clipping method.\033[0m")
+            return make_positive_definite(corr)
 
 
 def plot_heatmap(data, x_labels, y_labels, cmap='coolwarm', save_path=None, title=None):
@@ -246,8 +246,8 @@ def plot_text_heatmap(data, x_labels, y_labels, cmap='coolwarm', save_path=None,
                      cbar=True,
                      annot=True,
                      square=True,
-                     fmt='.1e',
-                     annot_kws={'size': 8},
+                     fmt='.1f',
+                     annot_kws={'size': 10},
                      yticklabels=y_labels,
                      xticklabels=x_labels)
 
@@ -386,7 +386,7 @@ def plot_histograms_column(country_data, country_names, xlabel, type_of_data, sa
         
         plt.show()
 
-[countries, wind_data, pv_data, demand, times, n] = numpy_csv_reader("../data/wind_data_annual_matching_modified.csv","../data/pv_data_annual_matching_modified.csv","../data/demand_data_annual_matching_modified.csv")
+"""[countries, wind_data, pv_data, demand, times, n] = numpy_csv_reader("../data/wind_data_annual_matching_modified.csv","../data/pv_data_annual_matching_modified.csv","../data/demand_data_annual_matching_modified.csv")
 #[countries, wind_data, pv_data, demand, times, n] = numpy_csv_reader("../data/wind_data_annual_matching.csv","../data/pv_data_annual_matching.csv","../data/demand_data_annual_matching.csv")
 
 r = computing_mean(wind_data,pv_data,n)
@@ -394,9 +394,11 @@ d = np.mean(demand)
 sigma_d = np.sqrt(np.mean(np.diag(np.cov(demand,rowvar=False))))
 
 cov_r = r_covariance_matrix(wind_data,pv_data,n)
+corr = correlation_matrix(wind_data,pv_data,n)"""
 
 #plot_heatmap(cov_r, 2*countries, 2*countries, save_path=f'../data/plots/heatmap_wind_and_pv_not_positive_definite_n={n}.png', title=f'R Covariance Heatmap ( not definite positive | n={n})', cmap="plasma")
-plot_text_heatmap(cov_r, 2*countries, 2*countries, save_path=f'../data/plots/heatmap_wind_and_pv_clipping_n={n}.png', title=f'R Covariance Heatmap ( clipping method | n={n})', cmap="plasma")
+#plot_text_heatmap(cov_r, 2*countries, 2*countries, save_path=f'../data/plots/heatmap_wind_and_pv_sdp_n={n}.png', title=f'R Covariance Heatmap ( sdp method | n={n})', cmap="plasma")
 #plot_country_data(times, pv_data, countries, plot_title="pv data" , yaxis_label = "capacity factor", save_path = '../data/plots/pv_yearly.png')
-#plot_histograms(country_data= pv_data, country_names=countries, xlabel="Pv capacity factor", type_of_data="pv", save_path="../data/histograms")
-#plot_histograms_column(country_data= pv_data, country_names=countries, xlabel="Pv capacity factor", type_of_data="pv", save_path="../data/histograms")
+#plot_histograms(country_data= wind_data, country_names=countries, xlabel="Wind capacity factor", type_of_data="wind", save_path="../data/histograms")
+#plot_histograms(country_data= demand, country_names=countries, xlabel="demand(GWh)", type_of_data="demand", save_path="../data/histograms")
+#plot_histograms_column(country_data= demand, country_names=countries, xlabel="demand(GWh)", type_of_data="demand", save_path="../data/histograms")
