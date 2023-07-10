@@ -9,6 +9,15 @@ wind_max = '../data/original_data/max_capacities_wind.csv'
 pv_max = '../data/original_data/max_capacities_pv.csv'
 
 def aggregate_data_daily(input_file, output_file):
+
+    """
+    Aggregate data from an input CSV file on a daily basis.
+
+    Parameters:
+    - input_file (str): Path to the input CSV file.
+    - output_file (str): Path to save the aggregated data as a new CSV file.
+    """
+
     # Read the CSV file
     df = pd.read_csv(input_file)
 
@@ -26,6 +35,15 @@ def aggregate_data_daily(input_file, output_file):
 
 
 def aggregate_data_annual(input_file, output_file):
+
+    """
+    Aggregate data from an input CSV file on an annual basis.
+
+    Parameters:
+    - input_file (str): Path to the input CSV file.
+    - output_file (str): Path to save the aggregated data as a new CSV file.
+    """
+        
     # Read the CSV file
     df = pd.read_csv(input_file)
 
@@ -42,6 +60,14 @@ def aggregate_data_annual(input_file, output_file):
     df_yearly.to_csv(output_file)
 
 def sort_csv_column(input_file):
+
+    """
+    Sort the columns of a CSV file in alphabetical order.
+
+    Parameters:
+    - input_file (str): Path to the input CSV file.
+    """
+
     # Read the CSV file
     df = pd.read_csv(input_file)
 
@@ -61,6 +87,14 @@ def sort_csv_column(input_file):
     sorted_df.to_csv(file_matching, index=False)
 
 def keep_matching_columns(file1, file2, file3, file4, file5):
+
+    """
+    Keep only the columns that are common among multiple CSV files.
+
+    Parameters:
+    - file1, file2, file3, file4, file5 (str): Paths to the input CSV files.
+    """
+        
     # Read the CSV files into pandas DataFrames
     df1 = pd.read_csv(file1)
     df2 = pd.read_csv(file2)
@@ -104,6 +138,15 @@ def keep_matching_columns(file1, file2, file3, file4, file5):
     df5_common.to_csv(file5_matching, index=False)
 
 def delete_last_columns(input_file, n):
+
+    """
+    Delete the last n columns of a CSV file.
+
+    Parameters:
+    - input_file (str): Path to the input CSV file.
+    - n (int): Number of columns to delete from the end.
+    """
+        
     # Read the input CSV file using pandas
     df = pd.read_csv(input_file)
 
@@ -128,7 +171,7 @@ def delete_last_columns(input_file, n):
 #keep_matching_columns(wind,pv,demand,pv_max,wind_max)
 
 # 1 < k < 24 
-k = 8 # n = 24 - k localization 
+k = 12 # n = 24 - k localization  ## k = 8 max pour les plots 
 
 delete_last_columns('../data/demand_data_annual_matching.csv',k)
 delete_last_columns('../data/pv_data_annual_matching.csv',k)
