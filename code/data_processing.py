@@ -1,13 +1,5 @@
 import pandas as pd
 
-# Provide the paths for input and output files
-
-wind = '../data/original_data/wind_data_annual.csv'
-pv = '../data/original_data/pv_data_annual.csv'
-demand = '../data/original_data/demand_data_annual.csv'
-wind_max = '../data/original_data/max_capacities_wind.csv'
-pv_max = '../data/original_data/max_capacities_pv.csv'
-
 def aggregate_data_daily(input_file, output_file):
 
     """
@@ -32,7 +24,6 @@ def aggregate_data_daily(input_file, output_file):
 
     # Write the aggregated data to a new CSV file
     df_daily.to_csv(output_file)
-
 
 def aggregate_data_annual(input_file, output_file):
 
@@ -147,34 +138,21 @@ def delete_last_columns(input_file, n):
     - n (int): Number of columns to delete from the end.
     """
         
-    # Read the input CSV file using pandas
-    df = pd.read_csv(input_file)
+    if n == 0 : 
+        # Read the input CSV file using pandas
+        df = pd.read_csv(input_file)
 
-    # Remove the last n columns
-    modified_df = df.iloc[:, :-n]
+        # Write the modified DataFrame to a new CSV file
+        output_file = input_file.rstrip('.csv') + '_modified.csv'
+        df.to_csv(output_file, index=False)
+    else : 
 
-    # Write the modified DataFrame to a new CSV file
-    output_file = input_file.rstrip('.csv') + '_modified.csv'
-    modified_df.to_csv(output_file, index=False)
+        # Read the input CSV file using pandas
+        df = pd.read_csv(input_file)
 
-# Call the function to aggregate the data and create the output CSV
+        # Remove the last n columns
+        modified_df = df.iloc[:, :-n]
 
-#input_csv = '../data/demand_data_hourly.csv'
-#output_csv = '../data/demand_data_annual.csv'
-#aggregate_data_annual(input_csv, output_csv)
-
-
-#sort_csv_column(wind)
-#sort_csv_column(pv)
-#sort_csv_column(demand)
-
-#keep_matching_columns(wind,pv,demand,pv_max,wind_max)
-
-# 1 < k < 24 
-k = 12 # n = 24 - k localization  ## k = 8 max pour les plots 
-
-delete_last_columns('../data/demand_data_annual_matching.csv',k)
-delete_last_columns('../data/pv_data_annual_matching.csv',k)
-delete_last_columns('../data/wind_data_annual_matching.csv',k)
-delete_last_columns('../data/max_capacities_wind_matching.csv',k)
-delete_last_columns('../data/max_capacities_pv_matching.csv',k)
+        # Write the modified DataFrame to a new CSV file
+        output_file = input_file.rstrip('.csv') + '_modified.csv'
+        modified_df.to_csv(output_file, index=False)

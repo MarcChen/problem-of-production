@@ -33,7 +33,7 @@ def save_or_show_plot(save_path, dpi):
         plt.savefig(save_path, dpi=dpi)
     plt.close()
 
-def draw_map_plot(data_dir, path_rg, path_bn, c_max, c, n, countries, dpi = 350, save_path=None):
+def draw_map_plot(data_dir, path_rg, path_bn, c_max, c, n, countries, dpi = 350, save_path= None, title = None):
 
     """
     Function to draw a map plot.
@@ -48,6 +48,7 @@ def draw_map_plot(data_dir, path_rg, path_bn, c_max, c, n, countries, dpi = 350,
     - countries: List of country codes (list)
     - dpi: DPI (dots per inch) for the plot (int, optional)
     - save_path: Path to save the plot (string, optional)
+    - title: Title for the plot (string, optional)
     """
 
     path_rg = data_dir + path_rg
@@ -123,8 +124,8 @@ def draw_map_plot(data_dir, path_rg, path_bn, c_max, c, n, countries, dpi = 350,
     width = 5e4  # adjust as needed
     for index, (i, row) in enumerate(gdf_rg.iterrows()):
         centroid = row.geometry.centroid
-        bar1_height = row['wind_capacities_allocated'] * 80  # adjust as needed
-        bar2_height = row['pv_capacities_allocated'] * 80  # adjust as needed
+        bar1_height = row['wind_capacities_allocated'] * 8  # adjust as needed
+        bar2_height = row['pv_capacities_allocated'] * 8  # adjust as needed
 
         # Get the colors from the colormap
         color1 = cmap(norm(row['wind_capacities_allocated']))
@@ -198,6 +199,10 @@ def draw_map_plot(data_dir, path_rg, path_bn, c_max, c, n, countries, dpi = 350,
 
     ax.plot(point_x, point_y, 'o', markersize=10, color='purple', transform=ax.transAxes)
 
+    # Set the title of the plot if provided
+    if title is not None:
+        ax.set_title(title, fontsize=14, fontweight='bold', ha='center')
+        
     save_or_show_plot(save_path,dpi)
 
 def plot_heatmap(data, x_labels, y_labels, cmap='coolwarm', save_path=None, title=None, dpi=350):
