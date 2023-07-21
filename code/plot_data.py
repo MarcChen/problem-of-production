@@ -10,10 +10,6 @@ import seaborn as sns
 import matplotlib.ticker as ticker
 
 
-data_dir="../data/map/"
-path_rg="NUTS_RG_01M_2021_3035_LEVL_0.json"
-path_bn="NUTS_BN_01M_2021_3035_LEVL_0.json"
-
 def save_or_show_plot(save_path, dpi):
 
     """
@@ -33,7 +29,7 @@ def save_or_show_plot(save_path, dpi):
         plt.savefig(save_path, dpi=dpi)
     plt.close()
 
-def draw_map_plot(data_dir, path_rg, path_bn, c_max, c, n, countries, dpi = 350, save_path= None, title = None):
+def draw_map_plot(data_dir, path_rg, path_bn, c_max, c, n, countries, percentage, dpi = 350, save_path= None, title = None):
 
     """
     Function to draw a map plot.
@@ -198,6 +194,243 @@ def draw_map_plot(data_dir, path_rg, path_bn, c_max, c, n, countries, dpi = 350,
     point_y = y + 0.1 * dot_offset
 
     ax.plot(point_x, point_y, 'o', markersize=10, color='purple', transform=ax.transAxes)
+
+    # Add box with text below the legend box
+    text_box_x = legend_x
+    text_box_y = legend_y - legend_height - 0.11  # Adjust the y-coordinate as needed
+    text_box_width = legend_width
+    text_box_height = 0.085  # Adjust the height as needed
+    ax.add_patch(patches.Rectangle((text_box_x, text_box_y), text_box_width, text_box_height,
+                                linewidth=1, edgecolor='black', facecolor='lightgray', alpha=0.4,
+                                transform=ax.transAxes, zorder=10))
+    # Add percentage text in red on top of the main text
+    percentage_text = '-{}%'.format(percentage)
+    text = 'Production variance\n compared to each \ncountry allocating\n max capacity'
+    ax.text(text_box_x + text_box_width / 2, text_box_y + text_box_height / 2 + 0.020,
+            percentage_text,
+            color='red', ha='center', va='center', fontsize=12, fontweight='bold', transform=ax.transAxes)
+    ax.text(text_box_x + text_box_width / 2, text_box_y + text_box_height / 2 - 0.020,
+            text,
+            color='black', ha='center', va='center', fontsize=7, transform=ax.transAxes)
+
+
+
+
+    # Set the title of the plot if provided
+    if title is not None:
+        ax.set_title(title, fontsize=14, fontweight='bold', ha='center')
+        
+    save_or_show_plot(save_path,dpi)
+
+def draw_map_plot_comparaison(data_dir, path_rg, path_bn, c_max, c_bench, c_new, n, countries, obj_bench, obj_new, dpi = 350, save_path= None, title = None):
+
+    """
+    Function to draw a map plot.
+
+    Parameters:
+    - data_dir: Directory path of the data files (string)
+    - path_rg: Path to the file containing regional data (string)
+    - path_bn: Path to the file containing boundary data (string)
+    - c_max: Maximum capacity values for wind and PV (1D numpy array of shape (2*n,))
+    - c: Capacity values for wind and PV (1D numpy array of shape (2*n,))
+    - n: Number of country (int)
+    - countries: List of country codes (list)
+    - dpi: DPI (dots per inch) for the plot (int, optional)
+    - save_path: Path to save the plot (string, optional)
+    - title: Title for the plot (string, optional)
+    """
+
+    path_rg = data_dir + path_rg
+    path_bn = data_dir + path_bn
+
+    gdf_rg = gpd.read_file(path_rg)
+    gdf_bn = gpd.read_file(path_bn)
+
+    # Filter GeoDataFrames by countries
+    gdf_rg = gdf_rg[gdf_rg['CNTR_CODE'].isin(countries)]
+
+    # Define your geographical boundary box
+    minx, miny, maxx, maxy = 2.0e6, 0, 8.0e6, 6.0e6  # Replace these values with the ones from your plot axes
+
+    # Create a box from your boundary
+    boundary = gpd.GeoSeries(box(minx, miny, maxx, maxy), crs=gdf_rg.crs)
+
+    # Check for any invalid geometries and fix them
+    gdf_rg['geometry'] = gdf_rg.geometry.apply(lambda x: x.buffer(0) if not x.is_valid else x)
+    gdf_bn['geometry'] = gdf_bn.geometry.apply(lambda x: x.buffer(0) if not x.is_valid else x)
+
+    # Replace 'within' with 'intersection'
+    gdf_rg.geometry = gdf_rg.geometry.intersection(boundary.geometry.iloc[0])
+    gdf_bn.geometry = gdf_bn.geometry.intersection(boundary.geometry.iloc[0])
+
+    # Plot the GeoDataFrame
+    ax = gdf_rg.plot(figsize=(20, 15), color="lightgray")
+    gdf_bn.plot(figsize=(20, 15), ax=ax, color="black")
+
+    # Plot the centroids
+    centroids = gdf_rg.geometry.centroid
+    centroids.plot(ax=ax, color="purple")
+
+    # Sort the GeoDataFrame based on CNTR_CODE column
+    gdf_rg = gdf_rg.sort_values('CNTR_CODE')
+
+    buffer1 = (c_new[:n]-c_bench[:n])/c_bench[:n]
+    buffer1[np.abs(buffer1) <= 1e-3] = 0
+
+    buffer2 = (c_new[n:]-c_bench[n:])/c_bench[n:]
+    buffer2[np.abs(buffer2) <= 1e-3] = 0
+
+    gdf_rg['wind_variation'] = buffer1
+    gdf_rg['pv_variation'] = buffer2
+
+
+    print(gdf_rg)
+
+    # Define function to draw bar
+    def draw_bar(ax, x, y, width, height, color, alpha):
+        ax.add_patch(patches.Rectangle((x, y), width, height, facecolor=color, alpha=alpha, edgecolor='none'))
+
+    # Width of the bars
+    width = 5e4  # adjust as needed
+    log_scale_factor = 0.1  # Adjust as needed
+
+    for index, (i, row) in enumerate(gdf_rg.iterrows()):
+        centroid = row.geometry.centroid
+        bar1_height = row['wind_variation']  # adjust as needed
+        bar2_height = row['pv_variation']  # adjust as needed
+
+        # Get the colors from the colormap
+        color1 = 'red' if row['wind_variation'] < 0 else 'green'
+        color2 = 'red' if row['pv_variation'] < 0 else 'green'
+
+        # Apply the scaling to the heights
+        """ if abs(bar1_height) < 1e3 : 
+             bar1_height_scaled = bar1_height / 100000
+        else :
+            bar1_height_scaled = bar1_height * 100
+
+        if abs(bar2_height) < 1e3 : 
+             bar2_height_scaled = bar1_height / 100000
+        else : 
+            bar2_height_scaled = bar1_height * 100 """
+        
+            # Apply the logarithmic scaling to the heights
+        bar1_height_scaled = np.sign(bar1_height) * np.log1p(np.abs(bar1_height) * log_scale_factor) * 20000
+        bar2_height_scaled = np.sign(bar2_height) * np.log1p(np.abs(bar2_height) * log_scale_factor) * 20000
+
+        if (abs(bar1_height_scaled) < 1e4): 
+            bar1_height_scaled *= 20
+        if (abs(bar2_height_scaled) < 1e4): 
+            bar2_height_scaled *= 20
+
+        # Print the heights for debugging
+        #print(f'Row {index}, Bar1 height scaled: {bar1_height_scaled}, Bar2 height scaled: {bar2_height_scaled}')
+
+        # Then draw the actual data bars
+        draw_bar(ax, centroid.x - width - width / 14, centroid.y, width, bar1_height_scaled, color=color1, alpha=0.7)
+        draw_bar(ax, centroid.x + width / 14, centroid.y, width, bar2_height_scaled, color=color2, alpha=0.7)
+
+        # Add label for percentage (wind_capacities_allocated)
+        font_size = 6
+        """ index =  countries.index(row["CNTR_CODE"]) """
+        percentage1 = float(row["wind_variation"] * 100)
+
+        # Determine the y position for the labels based on the color
+        y_position1 = centroid.y - 0.05 if color1 == 'green' else centroid.y + 170000
+        y_position2 = centroid.y - 0.05 if color2 == 'green' else centroid.y + 170000
+        
+
+        if abs(percentage1) > 100:
+            ax.text(centroid.x - width / 2, y_position1 , f'{percentage1:.1g}%',
+                color=color1, ha='center', va='top', rotation='vertical', fontsize=font_size, alpha=0.7)
+        else:
+            ax.text(centroid.x - width / 2, y_position1 , f'{percentage1:.1f}%',
+                    color=color1, ha='center', va='top', rotation='vertical', fontsize=font_size, alpha=0.7)
+
+        # Add label for percentage (pv_capacities_allocated)
+        percentage2 = row["pv_variation"] * 100
+        if abs(percentage2) > 100:
+            ax.text(centroid.x + width / 2, y_position2, f'{percentage2:.1g}%',
+                    color=color2, ha='center', va='top', rotation='vertical', fontsize=font_size, alpha=0.7)
+        else:
+            ax.text(centroid.x + width / 2, y_position2, f'{percentage2:.1f}%',
+                    color=color2, ha='center', va='top', rotation='vertical', fontsize=font_size, alpha=0.7)
+
+    # Add legend rectangle
+    legend_x = 0.90
+    legend_y = 0.94
+    legend_width = 0.09
+    legend_height = 0.12
+
+    # Add legend header
+    header_height = 0.05
+    ax.add_patch(patches.Rectangle((legend_x, legend_y), legend_width, header_height,
+                                   linewidth=1, edgecolor='black', facecolor='lightgray', alpha=0.4,
+                                   transform=ax.transAxes, zorder=10))
+    ax.text(legend_x + legend_width / 2, legend_y + header_height / 2, 'Allocation \nvariation', color='black',
+            ha='center', va='center', fontsize=10, fontweight='bold', transform=ax.transAxes)
+
+    ax.add_patch(patches.Rectangle((legend_x, legend_y - legend_height), legend_width, legend_height,
+                                   linewidth=1, edgecolor='black', facecolor='lightgray', alpha=0.4,
+                                   transform=ax.transAxes, zorder=10))
+
+    # Add custom legend bars and text
+    spacing = 0.01
+    bar_width = legend_width * 0.35
+    bar_height = legend_height * 0.65
+    text_offset = 0.005  # Offset to position the text below the bars
+    x1 = legend_x + (legend_width - (2 * bar_width + spacing)) / 2 + 0.2 * spacing # X-coordinate for the first bar
+    x2 = x1 + bar_width + spacing * 0.6 + 0.2 * spacing  # X-coordinate for the second bar
+    y = legend_y - legend_height + 2.5 * spacing
+
+    # Add Wind bar and text
+    ax.add_patch(patches.Rectangle((x1, y),
+                                bar_width, bar_height, facecolor='green', alpha=0.7, transform=ax.transAxes))
+    ax.text(x1 + bar_width / 2, y - text_offset,
+            'Wind', color='green', ha='center', va='top', transform=ax.transAxes, alpha=1.0)
+
+    # Add PV bar and text
+    ax.add_patch(patches.Rectangle((x2, y),
+                                bar_width, bar_height, facecolor='red', alpha=0.7, transform=ax.transAxes))
+    ax.text(x2 + bar_width / 2, y - text_offset,
+            'PV', color='darkred', ha='center', va='top', transform=ax.transAxes, alpha=1.0)
+
+    """ # Add Allocation text
+    allocation_x = legend_x + legend_width / 2  # X-coordinate for the allocation text
+    allocation_y = legend_y - legend_height + 1.5 * spacing   # Y-coordinate for the allocation text
+    ax.text(allocation_x, allocation_y,
+            'allocation', color='black', ha='center', va='top', transform=ax.transAxes) """
+
+    # Plot point between the rectangles
+    dot_offset = 0.016
+    point_x = (x1 + x2) / 2 + dot_offset
+    point_y = y + 0.1 * dot_offset
+
+    ax.plot(point_x, point_y, 'o', markersize=10, color='purple', transform=ax.transAxes)
+
+    percentage = abs(obj_bench - obj_new)/obj_bench
+    percentage = round(percentage,2)
+
+    # Add box with text below the legend box
+    text_box_x = legend_x
+    text_box_y = legend_y - legend_height - 0.11  # Adjust the y-coordinate as needed
+    text_box_width = legend_width
+    text_box_height = 0.085  # Adjust the height as needed
+    ax.add_patch(patches.Rectangle((text_box_x, text_box_y), text_box_width, text_box_height,
+                                linewidth=1, edgecolor='black', facecolor='lightgray', alpha=0.4,
+                                transform=ax.transAxes, zorder=10))
+    # Add percentage text in red on top of the main text
+    percentage_text = '-{}%'.format(percentage)
+    text = 'Production variance\n compared to\n bench scenario'
+    ax.text(text_box_x + text_box_width / 2, text_box_y + text_box_height / 2 + 0.020,
+            percentage_text,
+            color='red', ha='center', va='center', fontsize=12, fontweight='bold', transform=ax.transAxes)
+    ax.text(text_box_x + text_box_width / 2, text_box_y + text_box_height / 2 - 0.020,
+            text,
+            color='black', ha='center', va='center', fontsize=7, transform=ax.transAxes)
+
+
+
 
     # Set the title of the plot if provided
     if title is not None:
