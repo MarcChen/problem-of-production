@@ -70,9 +70,43 @@ Estimate the mean and covariance matrix of capacity factors and demand based on 
 
 Regarding the first problem, it's a quadratic optimization problem with linear constraint. I used CVXPY library to solve the problem. However, the second problem isn't **convex** so I needed to use an other library called 
 
+## Requirements
+
+This project uses the following Python packages:
+
+- numpy
+- cvxpy
+- scipy
+- time
+- random
+- pandas
+- geopandas
+- matplotlib
+- seaborn
+
+You can install these packages using pip:
+
+```bash
+pip install numpy cvxpy scipy pandas geopandas matplotlib seaborn
+````
+
 ## Repository structure 
 
 
+├── code # Source files   
+│ ├── data_processing.py # Data processing script     
+│ ├── import_data.py # Data importing script    
+│ ├── solver.py # Solver script  
+│ ├── global_problem.py # Main script  
+│ ├── plot_data.py # Data plotting script  
+│ └── simulation.py # Simulation script  
+├── data # Data files  
+│ ├── plots # Plot files  
+│ ├── map # Map files  
+│ ├── histogram # Histogram files  
+│ ├── original data # Original data files  
+│ └── ... # Other files  
+└── README.md # The file you're reading now
 
 ## How to install and run the project ? 
 
@@ -80,16 +114,15 @@ Regarding the first problem, it's a quadratic optimization problem with linear c
 ``git clone https://github.com/MarcChen/problem-of-production``
 
 2. Downloading your data into the [data](https://github.com/MarcChen/problem-of-production/tree/main/data) folder 
-3. Follow the instructions in the [code](https://github.com/MarcChen/problem-of-production/tree/main/code) folder to run the implementation and analyze the results.
+3. Follow the instructions in the README located in the [code](https://github.com/MarcChen/problem-of-production/tree/main/code) folder to run the implementation and analyze the results.
 
-## Know issues 
 
 ## Contributors 
 
+- Marc Chen 
 - Fred Espen Beth 
 - Marianne Zeyringer
 - Aleksander Grochowicz
-- Marc Chen 
 
 # Sources 
 
