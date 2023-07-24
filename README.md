@@ -124,7 +124,22 @@ pip install numpy cvxpy scipy pandas geopandas matplotlib seaborn
 - Marianne Zeyringer
 - Aleksander Grochowicz
 
-# Sources 
+# Licenses and Sources
 
 
-The data used comes from [] and is under license [...]
+All code in this repository is released under the GPL-3.0 or later license. All data generated in this repository is released under the CC-BY-4.0 license.
+
+- Demand data : data is licensed under CC-BY 4.0 (https://github.com/aleks-g/multidecade-data)
+
+- The renewable capacity factors used in this project are sourced from ERA5, available at https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-era5-single-levels?tab=doc.
+
+- The upper limits for c_max have been licensed under the MIT license. You can find the relevant licensing information at https://github.com/highRES-model/highRES-Europe/blob/master/LICENSE.
+
+- Map : When data downloaded from this page is used in any printed or electronic publication, in addition to any other provisions applicable to the whole Eurostat website, data source will have to be acknowledged in the legend of the map and in the introductory page of the publication with the following copyright notice:
+
+- EN: © EuroGeographics for the administrative boundaries
+- FR: © EuroGeographics pour les limites administratives
+- DE: © EuroGeographics bezüglich der Verwaltungsgrenzen
+For publications in languages other than English, French or German, the translation of the copyright notice in the language of the publication shall be used.
+
+If you intend to use the data commercially, please contact EuroGeographics for information regarding their licence agreements.
