@@ -160,5 +160,5 @@ cython_debug/
 #.idea/
 
 .Identifier
-data/
+*.png
 code/*.png
